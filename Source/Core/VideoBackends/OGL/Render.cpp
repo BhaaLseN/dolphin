@@ -33,6 +33,7 @@
 #include "VideoBackends/OGL/TextureConverter.h"
 #include "VideoBackends/OGL/VertexManager.h"
 
+#include "VideoCommon/AVDump.h"
 #include "VideoCommon/BPFunctions.h"
 #include "VideoCommon/BPStructs.h"
 #include "VideoCommon/DriverDetails.h"
@@ -57,9 +58,6 @@
 #endif
 
 #ifdef _WIN32
-#endif
-#if defined _WIN32 || defined HAVE_LIBAV
-#include "VideoCommon/AVIDump.h"
 #endif
 
 
@@ -111,6 +109,13 @@ static const u32 EFB_CACHE_HEIGHT = (EFB_HEIGHT + EFB_CACHE_RECT_SIZE - 1) / EFB
 static bool s_efbCacheValid[2][EFB_CACHE_WIDTH * EFB_CACHE_HEIGHT];
 static bool s_efbCacheIsCleared = false;
 static std::vector<u32> s_efbCache[2][EFB_CACHE_WIDTH * EFB_CACHE_HEIGHT]; // 2 for PEEK_Z and PEEK_COLOR
+
+// avi dumping state to delay one frame
+static u32 frame_dumping_pbo[2];
+static int last_frame_width;
+static int last_frame_height;
+static u64 last_frame_ticks;
+static bool last_frame_exported;
 
 static int GetNumMSAASamples(int MSAAMode)
 {
@@ -341,6 +346,10 @@ Renderer::Renderer()
 
 	s_ShowEFBCopyRegions_VBO = 0;
 	s_blendMode = 0;
+
+	frame_dumping_pbo[0] = 0;
+	frame_dumping_pbo[1] = 0;
+	last_frame_exported = false;
 
 	bool bSuccess = true;
 
@@ -637,6 +646,9 @@ void Renderer::Shutdown()
 	glDeleteBuffers(1, &s_ShowEFBCopyRegions_VBO);
 	glDeleteVertexArrays(1, &s_ShowEFBCopyRegions_VAO);
 	s_ShowEFBCopyRegions_VBO = 0;
+
+	if (frame_dumping_pbo[0])
+		glDeleteBuffers(2, frame_dumping_pbo);
 
 	delete s_pfont;
 	s_pfont = nullptr;
@@ -1299,23 +1311,11 @@ void Renderer::SetBlendMode(bool forceUpdate)
 	s_blendMode = newval;
 }
 
-static void DumpFrame(const std::vector<u8>& data, int w, int h)
-{
-#if defined(HAVE_LIBAV) || defined(_WIN32)
-		if (g_ActiveConfig.bDumpFrames && !data.empty())
-		{
-			AVIDump::AddFrame(&data[0], w, h);
-		}
-#endif
-}
-
 // This function has the final picture. We adjust the aspect ratio here.
-void Renderer::SwapImpl(u32 xfbAddr, u32 fbWidth, u32 fbHeight,const EFBRectangle& rc,float Gamma)
+void Renderer::SwapImpl(u32 xfbAddr, u32 fbWidth, u32 fbHeight,const EFBRectangle& rc, u64 ticks, float Gamma)
 {
-	static int w = 0, h = 0;
 	if (g_bSkipCurrentFrame || (!XFBWrited && !g_ActiveConfig.RealXFBEnabled()) || !fbWidth || !fbHeight)
 	{
-		DumpFrame(frame_data, w, h);
 		Core::Callback_VideoCopiedToXFB(false);
 		return;
 	}
@@ -1324,7 +1324,6 @@ void Renderer::SwapImpl(u32 xfbAddr, u32 fbWidth, u32 fbHeight,const EFBRectangl
 	const XFBSourceBase* const* xfbSourceList = FramebufferManager::GetXFBSource(xfbAddr, fbWidth, fbHeight, xfbCount);
 	if (g_ActiveConfig.VirtualXFBEnabled() && (!xfbSourceList || xfbCount == 0))
 	{
-		DumpFrame(frame_data, w, h);
 		Core::Callback_VideoCopiedToXFB(false);
 		return;
 	}
@@ -1428,119 +1427,42 @@ void Renderer::SwapImpl(u32 xfbAddr, u32 fbWidth, u32 fbHeight,const EFBRectangl
 
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
 
-	// Save screenshot
-	if (s_bScreenshot)
+	g_av_dump->SyncVideo();
+	if (last_frame_exported)
 	{
-		std::lock_guard<std::mutex> lk(s_criticalScreenshot);
-		SaveScreenshot(s_sScreenshotName, flipped_trc);
-		// Reset settings
-		s_sScreenshotName.clear();
-		s_bScreenshot = false;
+		glBindBuffer(GL_PIXEL_PACK_BUFFER, frame_dumping_pbo[0]);
+		void* data = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, last_frame_width * last_frame_height * 4, GL_MAP_READ_BIT);
+		g_av_dump->PushVideo(data, last_frame_width, last_frame_height, last_frame_ticks, true);
+		glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+
+		last_frame_exported = false;
 	}
-
-	// Frame dumps are handled a little differently in Windows
-	// Frame dumping disabled entirely on GLES3
-	if (GLInterface->GetMode() == GLInterfaceMode::MODE_OPENGL)
+	if (g_av_dump->DumpVideoEnabled())
 	{
-#if defined _WIN32 || defined HAVE_LIBAV
-		if (g_ActiveConfig.bDumpFrames)
+		if (!frame_dumping_pbo[0])
 		{
-			std::lock_guard<std::mutex> lk(s_criticalScreenshot);
-			if (frame_data.empty() || w != flipped_trc.GetWidth() ||
-				     h != flipped_trc.GetHeight())
-			{
-				w = flipped_trc.GetWidth();
-				h = flipped_trc.GetHeight();
-				frame_data.resize(3 * w * h);
-			}
-			glPixelStorei(GL_PACK_ALIGNMENT, 1);
-			glReadPixels(flipped_trc.left, flipped_trc.bottom, w, h, GL_BGR, GL_UNSIGNED_BYTE, &frame_data[0]);
-			if (GL_REPORT_ERROR() == GL_NO_ERROR && w > 0 && h > 0)
-			{
-				if (!bLastFrameDumped)
-				{
-					#ifdef _WIN32
-						bAVIDumping = AVIDump::Start(nullptr, w, h);
-					#else
-						bAVIDumping = AVIDump::Start(w, h);
-					#endif
-					if (!bAVIDumping)
-						OSD::AddMessage("AVIDump Start failed", 2000);
-					else
-					{
-						OSD::AddMessage(StringFromFormat(
-									"Dumping Frames to \"%sframedump0.avi\" (%dx%d RGB24)",
-									File::GetUserPath(D_DUMPFRAMES_IDX).c_str(), w, h), 2000);
-					}
-				}
-				if (bAVIDumping)
-				{
-					#ifndef _WIN32
-						FlipImageData(&frame_data[0], w, h);
-					#endif
-
-						AVIDump::AddFrame(&frame_data[0], w, h);
-				}
-
-				bLastFrameDumped = true;
-			}
-			else
-				NOTICE_LOG(VIDEO, "Error reading framebuffer");
+			glGenBuffers(2, frame_dumping_pbo);
+			glBindBuffer(GL_PIXEL_PACK_BUFFER, frame_dumping_pbo[0]);
 		}
 		else
 		{
-			if (bLastFrameDumped && bAVIDumping)
-			{
-				std::vector<u8>().swap(frame_data);
-				w = h = 0;
-				AVIDump::Stop();
-				bAVIDumping = false;
-				OSD::AddMessage("Stop dumping frames", 2000);
-			}
-			bLastFrameDumped = false;
+			std::swap(frame_dumping_pbo[0], frame_dumping_pbo[1]);
+			glBindBuffer(GL_PIXEL_PACK_BUFFER, frame_dumping_pbo[0]);
+			glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
 		}
-#else
-		if (g_ActiveConfig.bDumpFrames)
-		{
-			std::lock_guard<std::mutex> lk(s_criticalScreenshot);
-			std::string movie_file_name;
-			w = GetTargetRectangle().GetWidth();
-			h = GetTargetRectangle().GetHeight();
-			frame_data.resize(3 * w * h);
-			glPixelStorei(GL_PACK_ALIGNMENT, 1);
-			glReadPixels(GetTargetRectangle().left, GetTargetRectangle().bottom, w, h, GL_BGR, GL_UNSIGNED_BYTE, &frame_data[0]);
-			if (GL_REPORT_ERROR() == GL_NO_ERROR)
-			{
-				if (!bLastFrameDumped)
-				{
-					movie_file_name = File::GetUserPath(D_DUMPFRAMES_IDX) + "framedump.raw";
-					pFrameDump.Open(movie_file_name, "wb");
-					if (!pFrameDump)
-						OSD::AddMessage("Error opening framedump.raw for writing.", 2000);
-					else
-					{
-						OSD::AddMessage(StringFromFormat("Dumping Frames to \"%s\" (%dx%d RGB24)", movie_file_name.c_str(), w, h), 2000);
-					}
-				}
-				if (pFrameDump)
-				{
-					FlipImageData(&frame_data[0], w, h);
-					pFrameDump.WriteBytes(&frame_data[0], w * 3 * h);
-					pFrameDump.Flush();
-				}
-				bLastFrameDumped = true;
-			}
-		}
-		else
-		{
-			if (bLastFrameDumped)
-				pFrameDump.Close();
-			bLastFrameDumped = false;
-		}
-#endif
+
+		last_frame_width = flipped_trc.GetWidth();
+		last_frame_height = flipped_trc.GetHeight();
+		last_frame_exported = true;
+		last_frame_ticks = ticks;
+
+		glBufferData(GL_PIXEL_PACK_BUFFER, last_frame_width * last_frame_height * 4, nullptr, GL_STREAM_READ);
+		glPixelStorei(GL_PACK_ALIGNMENT, 1);
+		glReadPixels(flipped_trc.left, flipped_trc.bottom, last_frame_width, last_frame_height, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+		glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
 	}
+
 	// Finish up the current frame, print some stats
-
 	SetWindowSize(fbWidth, fbHeight);
 
 	GLInterface->Update(); // just updates the render window position and the backbuffer size
@@ -1808,33 +1730,3 @@ void Renderer::FlipImageData(u8 *data, int w, int h, int pixel_width)
 
 }
 
-namespace OGL
-{
-
-bool Renderer::SaveScreenshot(const std::string &filename, const TargetRectangle &back_rc)
-{
-	u32 W = back_rc.GetWidth();
-	u32 H = back_rc.GetHeight();
-	u8 *data = new u8[W * 4 * H];
-	glPixelStorei(GL_PACK_ALIGNMENT, 1);
-
-	glReadPixels(back_rc.left, back_rc.bottom, W, H, GL_RGBA, GL_UNSIGNED_BYTE, data);
-
-	// Show failure message
-	if (GL_REPORT_ERROR() != GL_NO_ERROR)
-	{
-		delete[] data;
-		OSD::AddMessage("Error capturing or saving screenshot.", 2000);
-		return false;
-	}
-
-	// Turn image upside down
-	FlipImageData(data, W, H, 4);
-	bool success = TextureToPng(data, W*4, filename, W, H, false);
-	delete[] data;
-
-	return success;
-
-}
-
-}

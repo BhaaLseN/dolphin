@@ -552,15 +552,15 @@ static void BeginField(FieldType field)
 		g_video_backend->Video_BeginField(xfbAddr, fbWidth, fbHeight);
 }
 
-static void EndField()
+static void EndField(u64 ticks)
 {
-	g_video_backend->Video_EndField();
+	g_video_backend->Video_EndField(ticks);
 	Core::VideoThrottle();
 }
 
 // Purpose: Send VI interrupt when triggered
 // Run when: When a frame is scanned (progressive/interlace)
-void Update()
+void Update(u64 ticks)
 {
 	if (m_DisplayControlRegister.NIN)
 	{
@@ -582,12 +582,12 @@ void Update()
 	if (m_VBeamPos == s_upperFieldBegin + m_VerticalTimingRegister.ACV)
 	{
 		// Interlace Upper.
-		EndField();
+		EndField(ticks);
 	}
 	else if (m_VBeamPos == s_lowerFieldBegin + m_VerticalTimingRegister.ACV)
 	{
 		// Interlace Lower
-		EndField();
+		EndField(ticks);
 	}
 
 	if (++m_VBeamPos > s_lineCount * fields)

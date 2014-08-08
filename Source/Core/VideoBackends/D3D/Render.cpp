@@ -24,6 +24,7 @@
 #include "VideoBackends/D3D/TextureCache.h"
 #include "VideoBackends/D3D/VertexShaderCache.h"
 
+#include "VideoCommon/AVDump.h"
 #include "VideoCommon/AVIDump.h"
 #include "VideoCommon/BPFunctions.h"
 #include "VideoCommon/Fifo.h"
@@ -666,60 +667,11 @@ void Renderer::SetBlendMode(bool forceUpdate)
 	}
 }
 
-bool Renderer::SaveScreenshot(const std::string &filename, const TargetRectangle& rc)
-{
-	if (!s_screenshot_texture)
-		CreateScreenshotTexture(rc);
-
-	// copy back buffer to system memory
-	D3D11_BOX box = CD3D11_BOX(rc.left, rc.top, 0, rc.right, rc.bottom, 1);
-	D3D::context->CopySubresourceRegion(s_screenshot_texture, 0, 0, 0, 0, (ID3D11Resource*)D3D::GetBackBuffer()->GetTex(), 0, &box);
-
-	D3D11_MAPPED_SUBRESOURCE map;
-	D3D::context->Map(s_screenshot_texture, 0, D3D11_MAP_READ_WRITE, 0, &map);
-
-	bool saved_png = TextureToPng((u8*)map.pData, map.RowPitch, filename, rc.GetWidth(), rc.GetHeight(), false);
-
-	D3D::context->Unmap(s_screenshot_texture, 0);
-
-
-	if (saved_png)
-	{
-		OSD::AddMessage(StringFromFormat("Saved %i x %i %s", rc.GetWidth(),
-		                                 rc.GetHeight(), filename.c_str()));
-	}
-	else
-	{
-		OSD::AddMessage(StringFromFormat("Error saving %s", filename.c_str()));
-	}
-
-	return saved_png;
-}
-
-void formatBufferDump(const u8* in, u8* out, int w, int h, int p)
-{
-	for (int y = 0; y < h; ++y)
-	{
-		auto line = (in + (h - y - 1) * p);
-		for (int x = 0; x < w; ++x)
-		{
-			out[0] = line[2];
-			out[1] = line[1];
-			out[2] = line[0];
-			out += 3;
-			line += 4;
-		}
-	}
-}
-
 // This function has the final picture. We adjust the aspect ratio here.
-void Renderer::SwapImpl(u32 xfbAddr, u32 fbWidth, u32 fbHeight,const EFBRectangle& rc,float Gamma)
+void Renderer::SwapImpl(u32 xfbAddr, u32 fbWidth, u32 fbHeight,const EFBRectangle& rc, u64 ticks, float Gamma)
 {
 	if (g_bSkipCurrentFrame || (!XFBWrited && !g_ActiveConfig.RealXFBEnabled()) || !fbWidth || !fbHeight)
 	{
-		if (g_ActiveConfig.bDumpFrames && !frame_data.empty())
-			AVIDump::AddFrame(&frame_data[0], fbWidth, fbHeight);
-
 		Core::Callback_VideoCopiedToXFB(false);
 		return;
 	}
@@ -728,9 +680,6 @@ void Renderer::SwapImpl(u32 xfbAddr, u32 fbWidth, u32 fbHeight,const EFBRectangl
 	const XFBSourceBase* const* xfbSourceList = FramebufferManager::GetXFBSource(xfbAddr, fbWidth, fbHeight, xfbCount);
 	if ((!xfbSourceList || xfbCount == 0) && g_ActiveConfig.bUseXFB && !g_ActiveConfig.bUseRealXFB)
 	{
-		if (g_ActiveConfig.bDumpFrames && !frame_data.empty())
-			AVIDump::AddFrame(&frame_data[0], fbWidth, fbHeight);
-
 		Core::Callback_VideoCopiedToXFB(false);
 		return;
 	}
@@ -829,70 +778,26 @@ void Renderer::SwapImpl(u32 xfbAddr, u32 fbWidth, u32 fbHeight,const EFBRectangl
 	}
 
 	// done with drawing the game stuff, good moment to save a screenshot
-	if (s_bScreenshot)
+	if (g_av_dump->DumpVideoEnabled())
 	{
-		SaveScreenshot(s_sScreenshotName, GetTargetRectangle());
-		s_bScreenshot = false;
-	}
-
-	// Dump frames
-	static int w = 0, h = 0;
-	if (g_ActiveConfig.bDumpFrames)
-	{
-		static int s_recordWidth;
-		static int s_recordHeight;
-
 		if (!s_screenshot_texture)
 			CreateScreenshotTexture(GetTargetRectangle());
 
+		// copy back buffer to system memory
 		D3D11_BOX box = CD3D11_BOX(GetTargetRectangle().left, GetTargetRectangle().top, 0, GetTargetRectangle().right, GetTargetRectangle().bottom, 1);
 		D3D::context->CopySubresourceRegion(s_screenshot_texture, 0, 0, 0, 0, (ID3D11Resource*)D3D::GetBackBuffer()->GetTex(), 0, &box);
-		if (!bLastFrameDumped)
-		{
-			s_recordWidth = GetTargetRectangle().GetWidth();
-			s_recordHeight = GetTargetRectangle().GetHeight();
-			bAVIDumping = AVIDump::Start(D3D::hWnd, s_recordWidth, s_recordHeight);
-			if (!bAVIDumping)
-			{
-				PanicAlert("Error dumping frames to AVI.");
-			}
-			else
-			{
-				std::string msg = StringFromFormat("Dumping Frames to \"%sframedump0.avi\" (%dx%d RGB24)",
-					File::GetUserPath(D_DUMPFRAMES_IDX).c_str(), s_recordWidth, s_recordHeight);
 
-				OSD::AddMessage(msg, 2000);
-			}
-		}
-		if (bAVIDumping)
-		{
-			D3D11_MAPPED_SUBRESOURCE map;
-			D3D::context->Map(s_screenshot_texture, 0, D3D11_MAP_READ, 0, &map);
+		D3D11_MAPPED_SUBRESOURCE map;
+		D3D::context->Map(s_screenshot_texture, 0, D3D11_MAP_READ, 0, &map);
 
-			if (frame_data.empty() || w != s_recordWidth || h != s_recordHeight)
-			{
-				frame_data.resize(3 * s_recordWidth * s_recordHeight);
-				w = s_recordWidth;
-				h = s_recordHeight;
-			}
-			formatBufferDump((u8*)map.pData, &frame_data[0], s_recordWidth, s_recordHeight, map.RowPitch);
-			AVIDump::AddFrame(&frame_data[0], GetTargetRectangle().GetWidth(), GetTargetRectangle().GetHeight());
-			D3D::context->Unmap(s_screenshot_texture, 0);
-		}
-		bLastFrameDumped = true;
+		g_av_dump->PushVideo(map.pData, GetTargetRectangle().GetWidth(), GetTargetRectangle().GetHeight(), ticks, false);
+		g_av_dump->SyncVideo();
+
+		D3D::context->Unmap(s_screenshot_texture, 0);
 	}
 	else
 	{
-		if (bLastFrameDumped && bAVIDumping)
-		{
-			std::vector<u8>().swap(frame_data);
-			w = h = 0;
-
-			AVIDump::Stop();
-			bAVIDumping = false;
-			OSD::AddMessage("Stop dumping frames to AVI", 2000);
-		}
-		bLastFrameDumped = false;
+		g_av_dump->SyncVideo();
 	}
 
 	// Reset viewport for drawing text

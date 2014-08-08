@@ -87,7 +87,7 @@ public:
 	virtual void Video_Cleanup() = 0; // called from gl/d3d thread
 
 	virtual void Video_BeginField(u32, u32, u32) = 0;
-	virtual void Video_EndField() = 0;
+	virtual void Video_EndField(u64 ticks) = 0;
 
 	virtual u32 Video_AccessEFB(EFBAccessType, u32, u32, u32) = 0;
 	virtual u32 Video_GetQueryResult(PerfQueryType type) = 0;
@@ -134,7 +134,7 @@ class VideoBackendHardware : public VideoBackend
 	void Video_EnterLoop() override;
 	void Video_ExitLoop() override;
 	void Video_BeginField(u32, u32, u32) override;
-	void Video_EndField() override;
+	void Video_EndField(u64 ticks) override;
 
 	u32 Video_AccessEFB(EFBAccessType, u32, u32, u32) override;
 	u32 Video_GetQueryResult(PerfQueryType type) override;

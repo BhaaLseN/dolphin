@@ -14,7 +14,6 @@ namespace SWRenderer
 	void Prepare();
 	void Shutdown();
 
-	void SetScreenshot(const char *_szFilename);
 	void RenderText(const char* pstr, int left, int top, u32 color);
 	void DrawDebugText();
 
@@ -22,8 +21,8 @@ namespace SWRenderer
 	u8* getCurrentColorTexture();
 	void swapColorTexture();
 	void UpdateColorTexture(EfbInterface::yuv422_packed *xfb, u32 fbWidth, u32 fbHeight);
-	void DrawTexture(u8 *texture, int width, int height);
+	void DrawTexture(u8 *texture, int width, int height, u64 ticks);
 
-	void Swap(u32 fbWidth, u32 fbHeight);
+	void Swap(u32 fbWidth, u32 fbHeight, u64 ticks);
 	void SwapBuffer();
 }

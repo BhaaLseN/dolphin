@@ -28,8 +28,6 @@
 extern int frameCount;
 extern int OSDChoice;
 
-extern bool bLastFrameDumped;
-
 // Renderer really isn't a very good name for this class - it's more like "Misc".
 // The long term goal is to get rid of this class and replace it with others that make
 // more sense.
@@ -91,7 +89,6 @@ public:
 	static float EFBToScaledYf(float y) { return y * ((float)GetTargetHeight() / (float)EFB_HEIGHT); }
 
 	// Random utilities
-	static void SetScreenshot(const std::string& filename);
 	static void DrawDebugText();
 
 	virtual void RenderText(const std::string& text, int left, int top, u32 color) = 0;
@@ -107,10 +104,8 @@ public:
 	virtual void RestoreAPIState() = 0;
 
 	// Finish up the current frame, print some stats
-	static void Swap(u32 xfbAddr, u32 fbWidth, u32 fbHeight, const EFBRectangle& rc,float Gamma = 1.0f);
-	virtual void SwapImpl(u32 xfbAddr, u32 fbWidth, u32 fbHeight, const EFBRectangle& rc,float Gamma = 1.0f) = 0;
-
-	virtual bool SaveScreenshot(const std::string &filename, const TargetRectangle &rc) = 0;
+	static void Swap(u32 xfbAddr, u32 fbWidth, u32 fbHeight, const EFBRectangle& rc, u64 ticks, float Gamma = 1.0f);
+	virtual void SwapImpl(u32 xfbAddr, u32 fbWidth, u32 fbHeight, const EFBRectangle& rc, u64 ticks, float Gamma = 1.0f) = 0;
 
 	static PEControl::PixelFormat GetPrevPixelFormat() { return prev_efb_format; }
 	static void StorePixelFormat(PEControl::PixelFormat new_format) { prev_efb_format = new_format; }
@@ -126,14 +121,6 @@ protected:
 	static volatile bool s_bScreenshot;
 	static std::mutex s_criticalScreenshot;
 	static std::string s_sScreenshotName;
-
-#if defined _WIN32 || defined HAVE_LIBAV
-	bool bAVIDumping;
-#else
-	File::IOFile pFrameDump;
-#endif
-	std::vector<u8> frame_data;
-	bool bLastFrameDumped;
 
 	// The framebuffer size
 	static int s_target_width;

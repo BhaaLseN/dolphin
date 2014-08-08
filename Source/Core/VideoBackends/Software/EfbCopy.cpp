@@ -3,6 +3,7 @@
 // Refer to the license.txt file included.
 
 #include "Core/Core.h"
+#include "Core/CoreTiming.h"
 #include "Core/HW/Memmap.h"
 #include "VideoBackends/OGL/GLInterfaceBase.h"
 #include "VideoBackends/Software/BPMemLoader.h"
@@ -58,7 +59,7 @@ namespace EfbCopy
 				// TODO: Fix FifoPlayer by making proper use of VideoInterface!
 				//       This requires careful synchronization since GPU commands
 				//       are processed on a different thread than VI commands.
-				SWRenderer::Swap(fbWidth, fbHeight);
+				SWRenderer::Swap(fbWidth, fbHeight, CoreTiming::GetTicks());
 				DebugUtil::OnFrameEnd(fbWidth, fbHeight);
 			}
 		}

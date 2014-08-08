@@ -9,13 +9,14 @@
 #else
 #include <stdint.h>
 #endif
+#include <string>
 
 #include "Common/CommonTypes.h"
 
 class AVIDump
 {
 private:
-	static bool CreateFile();
+	static bool CreateFile(std::string filename);
 	static void CloseFile();
 	static void SetBitmapFormat();
 	static bool SetCompressionOptions();
@@ -23,9 +24,9 @@ private:
 
 public:
 #ifdef _WIN32
-	static bool Start(HWND hWnd, int w, int h);
+	static bool Start(HWND hWnd, int w, int h, std::string filename);
 #else
-	static bool Start(int w, int h);
+	static bool Start(int w, int h, std::string filename);
 #endif
 	static void AddFrame(const u8* data, int width, int height);
 

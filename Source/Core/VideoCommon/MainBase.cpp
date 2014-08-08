@@ -2,6 +2,7 @@
 #include "Common/Atomic.h"
 #include "Core/ConfigManager.h"
 
+#include "VideoCommon/AVDump.h"
 #include "VideoCommon/BPStructs.h"
 #include "VideoCommon/CommandProcessor.h"
 #include "VideoCommon/Fifo.h"
@@ -19,6 +20,7 @@
 bool s_BackendInitialized = false;
 
 volatile u32 s_swapRequested = false;
+static u64 s_swap_ticks = 0;
 u32 s_efbAccessRequested = false;
 volatile u32 s_FifoShuttingDown = false;
 
@@ -73,7 +75,7 @@ static void VideoFifo_CheckSwapRequest()
 		if (Common::AtomicLoadAcquire(s_swapRequested))
 		{
 			EFBRectangle rc;
-			Renderer::Swap(s_beginFieldArgs.xfbAddr, s_beginFieldArgs.fbWidth, s_beginFieldArgs.fbHeight,rc);
+			Renderer::Swap(s_beginFieldArgs.xfbAddr, s_beginFieldArgs.fbWidth, s_beginFieldArgs.fbHeight, rc, s_swap_ticks);
 			Common::AtomicStoreRelease(s_swapRequested, false);
 		}
 	}
@@ -111,10 +113,11 @@ void VideoBackendHardware::Video_BeginField(u32 xfbAddr, u32 fbWidth, u32 fbHeig
 }
 
 // Run from the CPU thread (from VideoInterface.cpp)
-void VideoBackendHardware::Video_EndField()
+void VideoBackendHardware::Video_EndField(u64 ticks)
 {
 	if (s_BackendInitialized)
 	{
+		s_swap_ticks = ticks;
 		Common::AtomicStoreRelease(s_swapRequested, true);
 	}
 }
@@ -132,7 +135,7 @@ void VideoBackendHardware::Video_ClearMessages()
 // Screenshot
 bool VideoBackendHardware::Video_Screenshot(const std::string& filename)
 {
-	Renderer::SetScreenshot(filename.c_str());
+	g_av_dump->Screenshot(filename);
 	return true;
 }
 
@@ -245,6 +248,7 @@ void VideoBackendHardware::DoState(PointerWrap& p)
 	p.DoMarker("VideoCommon");
 
 	p.Do(s_swapRequested);
+	p.Do(s_swap_ticks);
 	p.Do(s_efbAccessRequested);
 	p.Do(s_beginFieldArgs);
 	p.Do(s_accessEFBArgs);

@@ -203,7 +203,7 @@ void VertexManager::vFlush(bool useDstAlpha)
 		tr.right = Renderer::GetTargetWidth();
 		tr.top = 0;
 		tr.bottom = Renderer::GetTargetHeight();
-		g_renderer->SaveScreenshot(filename, tr);
+		//g_renderer->SaveScreenshot(filename, tr);
 	}
 #endif
 	g_Config.iSaveTargetId++;

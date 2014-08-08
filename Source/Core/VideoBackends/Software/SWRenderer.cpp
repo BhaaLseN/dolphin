@@ -14,7 +14,7 @@
 #include "VideoBackends/Software/SWCommandProcessor.h"
 #include "VideoBackends/Software/SWRenderer.h"
 #include "VideoBackends/Software/SWStatistics.h"
-#include "VideoCommon/ImageWrite.h"
+#include "VideoCommon/AVDump.h"
 #include "VideoCommon/OnScreenDisplay.h"
 
 static GLuint s_RenderTarget = 0;
@@ -26,18 +26,12 @@ static GLuint program;
 static u8 *s_xfbColorTexture[2];
 static int s_currentColorTexture = 0;
 
-static volatile bool s_bScreenshot;
-static std::mutex s_criticalScreenshot;
-static std::string s_sScreenshotName;
-
-
 // Rasterfont isn't compatible with GLES
 // degasus: I think it does, but I can't test it
 static RasterFont* s_pfont = nullptr;
 
 void SWRenderer::Init()
 {
-	s_bScreenshot = false;
 }
 
 void SWRenderer::Shutdown()
@@ -104,13 +98,6 @@ void SWRenderer::Prepare()
 		glEnable(GL_TEXTURE_2D);
 	}
 	GL_REPORT_ERRORD();
-}
-
-void SWRenderer::SetScreenshot(const char *_szFilename)
-{
-	std::lock_guard<std::mutex> lk(s_criticalScreenshot);
-	s_sScreenshotName = _szFilename;
-	s_bScreenshot = true;
 }
 
 void SWRenderer::RenderText(const char* pstr, int left, int top, u32 color)
@@ -203,29 +190,25 @@ void SWRenderer::UpdateColorTexture(EfbInterface::yuv422_packed *xfb, u32 fbWidt
 }
 
 // Called on the GPU thread
-void SWRenderer::Swap(u32 fbWidth, u32 fbHeight)
+void SWRenderer::Swap(u32 fbWidth, u32 fbHeight, u64 ticks)
 {
 	GLInterface->Update(); // just updates the render window position and the backbuffer size
 	if (!g_SWVideoConfig.bHwRasterizer)
-		SWRenderer::DrawTexture(getCurrentColorTexture(), fbWidth, fbHeight);
+		SWRenderer::DrawTexture(getCurrentColorTexture(), fbWidth, fbHeight, ticks);
 
 	swstats.frameCount++;
 	SWRenderer::SwapBuffer();
 	Core::Callback_VideoCopiedToXFB(true); // FIXME: should this function be called FrameRendered?
 }
 
-void SWRenderer::DrawTexture(u8 *texture, int width, int height)
+void SWRenderer::DrawTexture(u8 *texture, int width, int height, u64 ticks)
 {
 	// FIXME: This should add black bars when the game has set the VI to render less than the full xfb.
 
-	// Save screenshot
-	if (s_bScreenshot)
+	g_av_dump->SyncVideo();
+	if (g_av_dump->DumpVideoEnabled())
 	{
-		std::lock_guard<std::mutex> lk(s_criticalScreenshot);
-		TextureToPng(texture, width*4, s_sScreenshotName, width, height, false);
-		// Reset settings
-		s_sScreenshotName.clear();
-		s_bScreenshot = false;
+		g_av_dump->PushVideo(texture, width, height, ticks, false);
 	}
 
 	GLsizei glWidth = (GLsizei)GLInterface->GetBackBufferWidth();

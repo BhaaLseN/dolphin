@@ -40,39 +40,39 @@ AVISTREAMINFO m_header;
 AVICOMPRESSOPTIONS m_options;
 AVICOMPRESSOPTIONS *m_arrayOptions[1];
 BITMAPINFOHEADER m_bitmap;
+std::string m_filename;
 
-bool AVIDump::Start(HWND hWnd, int w, int h)
+bool AVIDump::Start(HWND hWnd, int w, int h, std::string filename)
 {
 	m_emuWnd = hWnd;
 	m_fileCount = 0;
+	m_filename = filename;
 
 	m_width = w;
 	m_height = h;
 
-	return CreateFile();
+	return CreateFile(filename);
 }
 
-bool AVIDump::CreateFile()
+bool AVIDump::CreateFile(std::string filename)
 {
 	m_totalBytes = 0;
 	m_frameCount = 0;
 
-	std::string movie_file_name = StringFromFormat("%sframedump%d.avi", File::GetUserPath(D_DUMPFRAMES_IDX).c_str(), m_fileCount);
-
 	// Create path
-	File::CreateFullPath(movie_file_name);
+	File::CreateFullPath(filename);
 
 	// Ask to delete file
-	if (File::Exists(movie_file_name))
+	if (File::Exists(filename))
 	{
-		if (AskYesNoT("Delete the existing file '%s'?", movie_file_name.c_str()))
-			File::Delete(movie_file_name);
+		if (AskYesNoT("Delete the existing file '%s'?", filename.c_str()))
+			File::Delete(filename);
 	}
 
 	AVIFileInit();
-	NOTICE_LOG(VIDEO, "Opening AVI file (%s) for dumping", movie_file_name.c_str());
+	NOTICE_LOG(VIDEO, "Opening AVI file (%s) for dumping", filename.c_str());
 	// TODO: Make this work with AVIFileOpenW without it throwing REGDB_E_CLASSNOTREG
-	HRESULT hr = AVIFileOpenA(&m_file, movie_file_name.c_str(), OF_WRITE | OF_CREATE, nullptr);
+	HRESULT hr = AVIFileOpenA(&m_file, filename.c_str(), OF_WRITE | OF_CREATE, nullptr);
 	if (FAILED(hr))
 	{
 		if (hr == AVIERR_BADFORMAT) NOTICE_LOG(VIDEO, "The file couldn't be read, indicating a corrupt file or an unrecognized format.");
@@ -172,7 +172,7 @@ void AVIDump::AddFrame(const u8* data, int w, int h)
 	{
 		CloseFile();
 		m_fileCount++;
-		CreateFile();
+		CreateFile(m_filename + StringFromFormat(".%d", m_fileCount));
 	}
 }
 
@@ -181,10 +181,10 @@ void AVIDump::SetBitmapFormat()
 	memset(&m_bitmap, 0, sizeof(m_bitmap));
 	m_bitmap.biSize = 0x28;
 	m_bitmap.biPlanes = 1;
-	m_bitmap.biBitCount = 24;
+	m_bitmap.biBitCount = 32;
 	m_bitmap.biWidth = m_width;
 	m_bitmap.biHeight = m_height;
-	m_bitmap.biSizeImage = 3 * m_width * m_height;
+	m_bitmap.biSizeImage = 4 * m_width * m_height;
 }
 
 bool AVIDump::SetCompressionOptions()
@@ -240,25 +240,25 @@ static void InitAVCodec()
 	}
 }
 
-bool AVIDump::Start(int w, int h)
+bool AVIDump::Start(int w, int h, std::string filename)
 {
 	s_width = w;
 	s_height = h;
 
 	InitAVCodec();
-	bool success = CreateFile();
+	bool success = CreateFile(filename);
 	if (!success)
 		CloseFile();
 	return success;
 }
 
-bool AVIDump::CreateFile()
+bool AVIDump::CreateFile(std::string filename)
 {
 	AVCodec* codec = nullptr;
 
 	s_format_context = avformat_alloc_context();
 	snprintf(s_format_context->filename, sizeof(s_format_context->filename), "%s",
-	         (File::GetUserPath(D_DUMPFRAMES_IDX) + "framedump0.avi").c_str());
+	         filename.c_str());
 	File::CreateFullPath(s_format_context->filename);
 
 	if (!(s_format_context->oformat = av_guess_format("avi", nullptr, nullptr)) ||
@@ -320,12 +320,12 @@ static void PreparePacket(AVPacket* pkt)
 
 void AVIDump::AddFrame(const u8* data, int width, int height)
 {
-	avpicture_fill((AVPicture*)s_src_frame, const_cast<u8*>(data), AV_PIX_FMT_BGR24, width, height);
+	avpicture_fill((AVPicture*)s_src_frame, const_cast<u8*>(data), AV_PIX_FMT_RGBA, width, height);
 
 	// Convert image from BGR24 to desired pixel format, and scale to initial
 	// width and height
 	if ((s_sws_context = sws_getCachedContext(s_sws_context,
-	                                          width, height, AV_PIX_FMT_BGR24,
+	                                          width, height, AV_PIX_FMT_RGBA,
 	                                          s_width, s_height, s_stream->codec->pix_fmt,
 	                                          SWS_BICUBIC, nullptr, nullptr, nullptr)))
 	{

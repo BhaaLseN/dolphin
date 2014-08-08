@@ -28,7 +28,7 @@ class VideoSoftware : public VideoBackend
 	void Video_EnterLoop() override;
 	void Video_ExitLoop() override;
 	void Video_BeginField(u32, u32, u32) override;
-	void Video_EndField() override;
+	void Video_EndField(u64 ticks) override;
 
 	u32 Video_AccessEFB(EFBAccessType, u32, u32, u32) override;
 	u32 Video_GetQueryResult(PerfQueryType type) override;

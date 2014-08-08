@@ -68,6 +68,34 @@ private:
 	volatile size_t m_waiting;
 };
 
+class Semaphore
+{
+public:
+	Semaphore() : count(0) {}
+
+	void notify()
+	{
+		std::unique_lock<std::mutex> lock(mutex);
+		++count;
+		condition.notify_one();
+	}
+
+	void wait()
+	{
+		std::unique_lock<std::mutex> lock(mutex);
+		while(!count)
+		{
+			condition.wait(lock);
+		}
+		--count;
+	}
+
+private:
+	std::mutex mutex;
+	std::condition_variable condition;
+	unsigned int count;
+};
+
 void SleepCurrentThread(int ms);
 void SwitchCurrentThread(); // On Linux, this is equal to sleep 1ms
 

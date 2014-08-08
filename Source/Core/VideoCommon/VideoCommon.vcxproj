@@ -35,6 +35,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <ItemGroup>
+    <ClCompile Include="AVDump.cpp" />
     <ClCompile Include="AVIDump.cpp" />
     <ClCompile Include="BPFunctions.cpp" />
     <ClCompile Include="BPMemory.cpp" />
@@ -80,6 +81,7 @@
     <ClCompile Include="XFStructs.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AVDump.h" />
     <ClInclude Include="AVIDump.h" />
     <ClInclude Include="BPFunctions.h" />
     <ClInclude Include="BPMemory.h" />
