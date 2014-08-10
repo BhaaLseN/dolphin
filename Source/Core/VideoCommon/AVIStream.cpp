@@ -262,6 +262,7 @@ void AVIDump::Stop()
 	}
 }
 
+static std::vector<u8> m_video_frame;
 void AVIDump::AddFrame(const u8* data, int w, int h)
 {
 	//static bool shown_error = false;
@@ -279,14 +280,15 @@ void AVIDump::AddFrame(const u8* data, int w, int h)
 	if (!m_clients.empty())
 	{
 		//libjpeg wants RGB; but data is RGBA
-		u8* d = const_cast<u8*>(data);
+		m_video_frame.resize(w * h * 3);
+		u8* d = m_video_frame.data();
 		for (int j = 0, i = 0; i < w * h * 3; i += 3, j += 4)
 		{
 			d[i] = data[j];
 			d[i + 1] = data[j + 1];
 			d[i + 2] = data[j + 2];
 		}
-		std::vector<unsigned char> jpg = write_JPEG_file(data, w, h, 100);
+		std::vector<unsigned char> jpg = write_JPEG_file(m_video_frame.data(), w, h, 100);
 		for (auto& client : m_clients)
 		{
 			Send(client, jpg.data(), jpg.size());
