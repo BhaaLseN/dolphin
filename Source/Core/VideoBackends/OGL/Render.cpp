@@ -1454,7 +1454,7 @@ void Renderer::SwapImpl(u32 xfbAddr, u32 fbWidth, u32 fbHeight,const EFBRectangl
 				frame_data.resize(3 * w * h);
 			}
 			glPixelStorei(GL_PACK_ALIGNMENT, 1);
-			glReadPixels(flipped_trc.left, flipped_trc.bottom, w, h, GL_BGR, GL_UNSIGNED_BYTE, &frame_data[0]);
+			glReadPixels(flipped_trc.left, flipped_trc.bottom, w, h, GL_RGB, GL_UNSIGNED_BYTE, &frame_data[0]);
 			if (GL_REPORT_ERROR() == GL_NO_ERROR && w > 0 && h > 0)
 			{
 				if (!bLastFrameDumped)

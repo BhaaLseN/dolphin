@@ -135,6 +135,9 @@
     <ClCompile Include="TextureDecoder_x64.cpp">
       <Filter>Decoding</Filter>
     </ClCompile>
+    <ClCompile Include="AVIStream.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CommandProcessor.h" />
