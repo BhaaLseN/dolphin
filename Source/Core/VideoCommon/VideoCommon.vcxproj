@@ -34,9 +34,26 @@
     <Import Project="..\..\VSProps\PrecompiledHeader.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ExternalsDir)zlib;$(ExternalsDir)libjpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Lib>
+      <AdditionalDependencies>jpeg.lib</AdditionalDependencies>
+    </Lib>
+    <Lib>
+      <AdditionalLibraryDirectories>$(ExternalsDir)libjpeg\x64</AdditionalLibraryDirectories>
+    </Lib>
+  </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="AVDump.cpp" />
-    <ClCompile Include="AVIDump.cpp" />
+    <ClCompile Include="AVDump.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="AVIDump.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="AVIStream.cpp" />
     <ClCompile Include="BPFunctions.cpp" />
     <ClCompile Include="BPMemory.cpp" />
     <ClCompile Include="BPStructs.cpp" />
