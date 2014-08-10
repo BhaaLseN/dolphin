@@ -7,13 +7,23 @@
 
 #include "jpeglib.h"
 
+#include "Common/FifoQueue.h"
 #include "Common/Logging/Log.h"
 #include "VideoCommon/AVIDump.h"
+
+struct WriteHelper
+{
+	u8* data;
+	int width;
+	int height;
+};
 
 HWND m_emuWnd;
 int m_width;
 int m_height;
 std::thread m_socket_listener;
+std::thread m_client_writer;
+Common::FifoQueue<WriteHelper*> m_data;
 std::vector<SOCKET> m_clients;
 bool m_streaming = false;
 
@@ -235,6 +245,42 @@ static void Listen()
 	closesocket(srv);
 }
 
+static std::vector<u8> m_flip_buffer;
+static u8* FlipImageData(const u8 *data, int w, int h, int pixel_width)
+{
+	// Flip image upside down. Damn OpenGL.
+	m_flip_buffer.resize(w * h * 3);
+	for (int y = 0; y < h; ++y)
+	{
+		memcpy(&m_flip_buffer[y * w * 3], &data[(h - y - 1) * w * 3], w * 3);
+	}
+	return m_flip_buffer.data();
+}
+
+static void WriteToClient()
+{
+	while (m_streaming)
+	{
+		if (!m_clients.empty())
+		{
+			WriteHelper* d;
+			while (m_data.Pop(d))
+			{
+				int h = d->height;
+				int w = d->width;
+				u8* data = FlipImageData(d->data, w, h, 3);
+				d->data = nullptr;
+				std::vector<unsigned char> jpg = write_JPEG_file(data, w, h, 100);
+				for (auto& client : m_clients)
+				{
+					Send(client, jpg.data(), jpg.size());
+				}
+				delete d;
+			}
+		}
+	}
+}
+
 bool AVIDump::Start(HWND hWnd, int w, int h)
 {
 	NOTICE_LOG(VIDEO, "Start streaming");
@@ -245,6 +291,7 @@ bool AVIDump::Start(HWND hWnd, int w, int h)
 	m_streaming = true;
 
 	m_socket_listener = std::thread(Listen);
+	m_client_writer = std::thread(WriteToClient);
 
 	return true; // TODO: did initialization of stuffs work?
 }
@@ -255,23 +302,12 @@ void AVIDump::Stop()
 	m_streaming = false;
 	if (m_socket_listener.joinable())
 		m_socket_listener.join();
+	if (m_client_writer.joinable())
+		m_client_writer.join();
 	for (auto& client : m_clients)
 	{
 		//TODO(avistream): be nicer?
 		closesocket(client);
-	}
-}
-
-static void FlipImageData(u8 *data, int w, int h, int pixel_width)
-{
-	// Flip image upside down. Damn OpenGL.
-	for (int y = 0; y < h / 2; ++y)
-	{
-		for (int x = 0; x < w; ++x)
-		{
-			for (int delta = 0; delta < pixel_width; ++delta)
-				std::swap(data[(y * w + x) * pixel_width + delta], data[((h - 1 - y) * w + x) * pixel_width + delta]);
-		}
 	}
 }
 
@@ -288,14 +324,21 @@ void AVIDump::AddFrame(const u8* data, int w, int h)
 	//	m_bitmap.biWidth = w;
 	//	m_bitmap.biHeight = h;
 	//}
+	if (m_clients.empty())
+		return;
 
-	if (!m_clients.empty())
-	{
-		FlipImageData(const_cast<u8*>(data), w, h, 3);
-		std::vector<unsigned char> jpg = write_JPEG_file(data, w, h, 100);
-		for (auto& client : m_clients)
-		{
-			Send(client, jpg.data(), jpg.size());
-		}
-	}
+	WriteHelper* d = new WriteHelper();
+	d->data = const_cast<u8*>(data);
+	d->width = w;
+	d->height = h;
+	m_data.Push(d);
+	//if (!m_clients.empty())
+	//{
+	//	FlipImageData(const_cast<u8*>(data), w, h, 3);
+	//	std::vector<unsigned char> jpg = write_JPEG_file(data, w, h, 100);
+	//	for (auto& client : m_clients)
+	//	{
+	//		Send(client, jpg.data(), jpg.size());
+	//	}
+	//}
 }
