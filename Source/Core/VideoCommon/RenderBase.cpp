@@ -28,6 +28,7 @@
 #include "Core/FifoPlayer/FifoRecorder.h"
 
 #include "VideoCommon/AVIDump.h"
+#include "VideoCommon/BoundingBox.h"
 #include "VideoCommon/BPMemory.h"
 #include "VideoCommon/CommandProcessor.h"
 #include "VideoCommon/CPMemory.h"
@@ -598,4 +599,9 @@ void Renderer::Swap(u32 xfbAddr, u32 fbWidth, u32 fbStride, u32 fbHeight, const 
 
 	Core::Callback_VideoCopiedToXFB(XFBWrited || (g_ActiveConfig.bUseXFB && g_ActiveConfig.bUseRealXFB));
 	XFBWrited = false;
+
+	// disable bounding box if it was enabled
+	// it seems the intended way of using it is to call GX_ClearBoundingBox, render geometry, and then call GX_ReadBoundingBox.
+	// and what better indication of "we rendered all our geometry" could there be than this place?
+	BoundingBox::active = false;
 }

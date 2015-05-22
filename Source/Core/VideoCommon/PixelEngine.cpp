@@ -233,7 +233,8 @@ void RegisterMMIO(MMIO::Mapping* mmio, u32 base)
 	{
 		mmio->Register(base | (PE_BBOX_LEFT + 2 * i),
 			MMIO::ComplexRead<u16>([i](u32) {
-				BoundingBox::active = false;
+				// BBox is disabled after each frame, no need to do it here anymore
+				// BoundingBox::active = false;
 				return g_video_backend->Video_GetBoundingBox(i);
 			}),
 			MMIO::InvalidWrite<u16>()

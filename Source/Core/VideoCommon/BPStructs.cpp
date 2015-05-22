@@ -233,6 +233,8 @@ static void BPWritten(const BPCmd& bp)
 				// here. Not sure if there's a better spot to put this.
 				// the number of lines copied is determined by the y scale * source efb height
 
+				// that better place might be Renderer::Swap?
+				// but it probably doesn't hurt to do it here too, should the XFB copy be earlier than end of frame.
 				BoundingBox::active = false;
 
 				float yScale;
