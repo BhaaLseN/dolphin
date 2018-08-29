@@ -218,11 +218,41 @@ add_library(core
   PowerPC/Interpreter/Interpreter_LoadStorePaired.cpp
   PowerPC/Interpreter/Interpreter_Paired.cpp
   PowerPC/Interpreter/Interpreter_SystemRegisters.cpp
-  PowerPC/Interpreter/Interpreter_Tables.cpp
   PowerPC/JitCommon/JitAsmCommon.cpp
   PowerPC/JitCommon/JitBase.cpp
   PowerPC/JitCommon/JitCache.cpp
 )
+
+add_executable(tablegen
+  PowerPC/TableGen.cpp
+)
+add_custom_command(
+  OUTPUT
+    Generated/OpID_Ranges.gen.h
+    Generated/OpID_DecodingTable.gen.cpp
+    Generated/OpInfo.gen.cpp
+    Generated/Interpreter_Table.gen.cpp
+    Generated/Cycles_Table.gen.cpp
+  COMMAND $<TARGET_FILE:tablegen> -i ${CMAKE_CURRENT_SOURCE_DIR}/../../../Data/instructions.csv
+    -ro Generated/OpID_Ranges.gen.h
+    -Do Generated/OpID_DecodingTable.gen.cpp
+    -Io Generated/OpInfo.gen.cpp
+    -0d '*' -p Interpreter:: -o Generated/Interpreter_Table.gen.cpp
+    -1d '1' -o Generated/Cycles_Table.gen.cpp
+    -r
+  DEPENDS tablegen
+  MAIN_DEPENDENCY ../../../Data/instructions.csv
+)
+target_include_directories(core PRIVATE
+  ${CMAKE_CURRENT_BINARY_DIR}/Generated
+)
+add_custom_target(ppctables DEPENDS
+  Generated/OpID_DecodingTable.gen.cpp
+  Generated/OpInfo.gen.cpp
+  Generated/Interpreter_Table.gen.cpp
+)
+add_custom_target(opidranges DEPENDS Generated/OpID_Ranges.gen.h)
+add_dependencies(core ppctables opidranges)
 
 if(_M_X86)
   target_sources(core PRIVATE

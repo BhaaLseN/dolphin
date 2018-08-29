@@ -25,7 +25,7 @@ namespace PPCAnalyst
 struct CodeOp  // 16B
 {
   UGeckoInstruction inst;
-  GekkoOPInfo* opinfo;
+  OpId opid;
   u32 address;
   u32 branchTo;       // if 0, not a branch
   int branchToIndex;  // index of target block

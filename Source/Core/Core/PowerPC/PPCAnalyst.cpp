@@ -105,7 +105,7 @@ bool AnalyzeFunction(u32 startAddr, Common::Symbol& func, u32 max_size)
     }
     const PowerPC::TryReadInstResult read_result = PowerPC::TryReadInstruction(addr);
     const UGeckoInstruction instr = read_result.hex;
-    if (read_result.valid && PPCTables::IsValidInstruction(instr))
+    if (read_result.valid && PPCTables::GetOpId(instr) != OpId::Invalid)
     {
       // BLR or RFI
       // 4e800021 is blrl, not the end of a function
@@ -193,10 +193,10 @@ static void AnalyzeFunction2(Common::Symbol* func)
 
 static bool CanSwapAdjacentOps(const CodeOp& a, const CodeOp& b)
 {
-  const GekkoOPInfo* a_info = a.opinfo;
-  const GekkoOPInfo* b_info = b.opinfo;
-  int a_flags = a_info->flags;
-  int b_flags = b_info->flags;
+  const GekkoOPInfo& a_info = PPCTables::opinfo[(int)a.opid];
+  const GekkoOPInfo& b_info = PPCTables::opinfo[(int)b.opid];
+  int a_flags = a_info.flags;
+  int b_flags = b_info.flags;
 
   // can't reorder around breakpoints
   if (SConfig::GetInstance().bEnableDebugging &&
@@ -226,11 +226,11 @@ static bool CanSwapAdjacentOps(const CodeOp& a, const CodeOp& b)
   // a crash caused by this error.
   //
   // [1] https://bugs.dolphin-emu.org/issues/5864#note-7
-  if (b_info->type != OpType::Integer)
+  if (b_info.type != OpType::Integer)
     return false;
 
   // And it's possible a might raise an interrupt too (fcmpo/fcmpu)
-  if (a_info->type != OpType::Integer)
+  if (a_info.type != OpType::Integer)
     return false;
 
   // Check that we have no register collisions.
@@ -261,7 +261,7 @@ static void FindFunctionsFromBranches(u32 startAddr, u32 endAddr, Common::Symbol
     const PowerPC::TryReadInstResult read_result = PowerPC::TryReadInstruction(addr);
     const UGeckoInstruction instr = read_result.hex;
 
-    if (read_result.valid && PPCTables::IsValidInstruction(instr))
+    if (read_result.valid && PPCTables::GetOpId(instr) != OpId::Invalid)
     {
       switch (instr.OPCD)
       {
@@ -309,7 +309,7 @@ static void FindFunctionsFromHandlers(PPCSymbolDB* func_db)
   for (const auto& entry : handlers)
   {
     const PowerPC::TryReadInstResult read_result = PowerPC::TryReadInstruction(entry.first);
-    if (read_result.valid && PPCTables::IsValidInstruction(read_result.hex))
+    if (read_result.valid && PPCTables::GetOpId(read_result.hex) != OpId::Invalid)
     {
       // Check if this function is already mapped
       Common::Symbol* f = func_db->AddFunction(entry.first);
@@ -341,7 +341,7 @@ static void FindFunctionsAfterReturnInstruction(PPCSymbolDB* func_db)
         location += 4;
         read_result = PowerPC::TryReadInstruction(location);
       }
-      if (read_result.valid && PPCTables::IsValidInstruction(read_result.hex))
+      if (read_result.valid && PPCTables::GetOpId(read_result.hex) != OpId::Invalid)
       {
         // check if this function is already mapped
         Common::Symbol* f = func_db->AddFunction(location);
@@ -439,8 +439,8 @@ static bool isCmp(const CodeOp& a)
 
 static bool isCarryOp(const CodeOp& a)
 {
-  return (a.opinfo->flags & FL_SET_CA) && !(a.opinfo->flags & FL_SET_OE) &&
-         a.opinfo->type == OpType::Integer;
+  auto& info = PPCTables::opinfo[(int)a.opid];
+  return (info.flags & FL_SET_CA) && !(info.flags & FL_SET_OE) && info.type == OpType::Integer;
 }
 
 static bool isCror(const CodeOp& a)
@@ -477,13 +477,13 @@ void PPCAnalyzer::ReorderInstructionsCore(u32 instructions, CodeOp* code, bool r
         // once we're next to a carry instruction, don't move away!
         if (type == ReorderType::Carry && i != start)
         {
+          auto aflags = PPCTables::opinfo[(int)a.opid].flags;
+          auto prevflags = PPCTables::opinfo[(int)code[i - increment].opid].flags;
           // if we read the CA flag, and the previous instruction sets it, don't move away.
-          if (!reverse && (a.opinfo->flags & FL_READ_CA) &&
-              (code[i - increment].opinfo->flags & FL_SET_CA))
+          if (!reverse && (aflags & FL_READ_CA) && (prevflags & FL_SET_CA))
             continue;
           // if we set the CA flag, and the next instruction reads it, don't move away.
-          if (reverse && (a.opinfo->flags & FL_SET_CA) &&
-              (code[i - increment].opinfo->flags & FL_READ_CA))
+          if (reverse && (aflags & FL_SET_CA) && (prevflags & FL_READ_CA))
             continue;
         }
 
@@ -687,18 +687,19 @@ u32 PPCAnalyzer::Analyze(u32 address, CodeBlock* block, CodeBuffer* buffer, std:
     num_inst++;
 
     const UGeckoInstruction inst = result.hex;
-    GekkoOPInfo* opinfo = PPCTables::GetOpInfo(inst);
+    OpId opid = PPCTables::GetOpId(inst);
+    GekkoOPInfo& opinfo = PPCTables::opinfo[(int)opid];
     code[i] = {};
-    code[i].opinfo = opinfo;
+    code[i].opid = opid;
     code[i].address = address;
     code[i].inst = inst;
     code[i].branchTo = UINT32_MAX;
     code[i].branchToIndex = UINT32_MAX;
     code[i].skip = false;
-    block->m_stats->numCycles += opinfo->numCycles;
+    block->m_stats->numCycles += PPCTables::Cycles(opid);
     block->m_physical_addresses.insert(result.physical_address);
 
-    SetInstructionStats(block, &code[i], opinfo, static_cast<u32>(i));
+    SetInstructionStats(block, &code[i], &opinfo, static_cast<u32>(i));
 
     bool follow = false;
     u32 destination = 0;
@@ -802,7 +803,7 @@ u32 PPCAnalyzer::Analyze(u32 address, CodeBlock* block, CodeBuffer* buffer, std:
     {
       // Just pick the next instruction
       address += 4;
-      if (!conditional_continue && opinfo->flags & FL_ENDBLOCK)  // right now we stop early
+      if (!conditional_continue && opinfo.flags & FL_ENDBLOCK)  // right now we stop early
       {
         found_exit = true;
         break;
@@ -860,7 +861,7 @@ u32 PPCAnalyzer::Analyze(u32 address, CodeBlock* block, CodeBuffer* buffer, std:
     gprInUse |= op.regsIn;
     gprInReg |= op.regsIn;
     fprInUse |= op.fregsIn;
-    if (strncmp(op.opinfo->opname, "stfd", 4))
+    if (strncmp(PPCTables::opinfo[(int)op.opid].opname, "stfd", 4))
       fprInXmm |= op.fregsIn;
     // For now, we need to count output registers as "used" though; otherwise the flush
     // will result in a redundant store (e.g. store to regcache, then store again to
@@ -876,6 +877,7 @@ u32 PPCAnalyzer::Analyze(u32 address, CodeBlock* block, CodeBuffer* buffer, std:
   for (u32 i = 0; i < block->m_num_instructions; i++)
   {
     CodeOp& op = code[i];
+    GekkoOPInfo& opinfo = PPCTables::opinfo[(int)op.opid];
 
     gprBlockInputs |= op.regsIn & ~gprDefined;
     gprDefined |= op.regsOut;
@@ -889,7 +891,7 @@ u32 PPCAnalyzer::Analyze(u32 address, CodeBlock* block, CodeBuffer* buffer, std:
       fprIsDuplicated[op.fregOut] = false;
       fprIsStoreSafe[op.fregOut] = false;
       // Single, duplicated, and doesn't need PPC_FP.
-      if (op.opinfo->type == OpType::SingleFP)
+      if (opinfo.type == OpType::SingleFP)
       {
         fprIsSingle[op.fregOut] = true;
         fprIsDuplicated[op.fregOut] = true;
@@ -899,13 +901,13 @@ u32 PPCAnalyzer::Analyze(u32 address, CodeBlock* block, CodeBuffer* buffer, std:
       // TODO: if we go directly from a load to store, skip conversion entirely?
       // TODO: if we go directly from a load to a float instruction, and the value isn't used
       // for anything else, we can skip PPC_FP on a load too.
-      if (!strncmp(op.opinfo->opname, "lfs", 3))
+      if (!strncmp(opinfo.opname, "lfs", 3))
       {
         fprIsSingle[op.fregOut] = true;
         fprIsDuplicated[op.fregOut] = true;
       }
       // Paired are still floats, but the top/bottom halves may differ.
-      if (op.opinfo->type == OpType::PS || op.opinfo->type == OpType::LoadPS)
+      if (opinfo.type == OpType::PS || opinfo.type == OpType::LoadPS)
       {
         fprIsSingle[op.fregOut] = true;
         fprIsStoreSafe[op.fregOut] = true;
@@ -913,11 +915,11 @@ u32 PPCAnalyzer::Analyze(u32 address, CodeBlock* block, CodeBuffer* buffer, std:
       // Careful: changing the float mode in a block breaks this optimization, since
       // a previous float op might have had had FTZ off while the later store has FTZ
       // on. So, discard all information we have.
-      if (!strncmp(op.opinfo->opname, "mtfs", 4))
+      if (!strncmp(opinfo.opname, "mtfs", 4))
         fprIsStoreSafe = BitSet32(0);
     }
 
-    if (op.opinfo->type == OpType::StorePS || op.opinfo->type == OpType::LoadPS)
+    if (opinfo.type == OpType::StorePS || opinfo.type == OpType::LoadPS)
     {
       const int gqr = op.inst.OPCD == 4 ? op.inst.Ix : op.inst.I;
       gqrUsed[gqr] = true;

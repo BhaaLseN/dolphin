@@ -34,7 +34,8 @@ PowerPCState ppcState;
 
 static CPUCoreBase* s_cpu_core_base = nullptr;
 static bool s_cpu_core_base_is_injected = false;
-Interpreter* const s_interpreter = Interpreter::getInstance();
+Interpreter interpreter;
+Interpreter* const s_interpreter = &interpreter;
 static CoreMode s_mode = CoreMode::Interpreter;
 
 BreakPoints breakpoints;
@@ -177,10 +178,6 @@ static void ResetRegisters()
 
 static void InitializeCPUCore(CPUCore cpu_core)
 {
-  // We initialize the interpreter because
-  // it is used on boot and code window independently.
-  s_interpreter->Init();
-
   switch (cpu_core)
   {
   case CPUCore::Interpreter:
@@ -271,7 +268,6 @@ void Shutdown()
 {
   InjectExternalCPUCore(nullptr);
   JitInterface::Shutdown();
-  s_interpreter->Shutdown();
   s_cpu_core_base = nullptr;
 }
 
