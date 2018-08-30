@@ -1,3 +1,7 @@
+// Copyright 2008 Dolphin Emulator Project
+// Licensed under GPLv2+
+// Refer to the license.txt file included.
+
 #include <bitset>
 #include <cstdlib>
 #include <deque>
@@ -5,6 +9,7 @@
 #include <iomanip>
 #include <iostream>
 #include <string>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -16,7 +21,8 @@ struct Instruction
   std::deque<std::string> dispatch;
   Instruction(std::string opname_, std::string type_, std::string flags_,
               std::deque<std::string> dispatch_)
-      : opname(opname_), type(type_), flags(flags_), dispatch(dispatch_)
+      : opname(std::move(opname_)), type(std::move(type_)), flags(std::move(flags_)),
+        dispatch(std::move(dispatch_))
   {
   }
 };
@@ -71,7 +77,7 @@ struct DecodingEntry
   int subtable_offset = 0;
   int shift = 0;
   int length = 0;
-  DecodingEntry(std::string name) : table_name(name) {}
+  DecodingEntry(std::string name) : table_name(std::move(name)) {}
 };
 
 static void CreateTable(std::vector<Instruction>& table, std::vector<DecodingEntry>& decoding_table,
@@ -227,7 +233,7 @@ static void ReadTable(std::istream& in, std::vector<std::deque<std::string>>& ro
     std::deque<std::string> row;
     if (line.empty())
     {
-      rows.push_back(row);
+      rows.push_back(std::move(row));
       continue;
     }
     while (true)
@@ -244,15 +250,14 @@ static void ReadTable(std::istream& in, std::vector<std::deque<std::string>>& ro
         break;
       }
     }
-    rows.push_back(row);
+    rows.push_back(std::move(row));
   }
 }
 
-int main(int argc, char** argv)
+void ParseCommandLine(int argc, char** argv, OutputOptions& stdout_options,
+                      std::vector<std::pair<std::ofstream, OutputOptions>>& file_outputs,
+                      std::string& inputfile)
 {
-  std::vector<std::pair<std::ofstream, OutputOptions>> file_outputs;
-  OutputOptions stdout_options;
-  std::string inputfile;
   if (argc == 1)
   {
     const char* help_string =
@@ -269,7 +274,7 @@ int main(int argc, char** argv)
         "-d <default> Set the default value for the previously-defined column. (use * for the "
         "opname)\n";
     std::cout << "Usage: " << argv[0] << help_string;
-    return 0;
+    std::exit(0);
   }
   for (int i = 1; i < argc; i += 1)
   {
@@ -278,7 +283,7 @@ int main(int argc, char** argv)
       std::cerr << "Error: unrecognized command line argument \"" << argv[i]
                 << "\".\n"
                    "Invoke without arguments for usage description\n";
-      return 1;
+      std::exit(1);
     }
     for (int n = 1; argv[i][n]; n += 1)
     {
@@ -290,7 +295,7 @@ int main(int argc, char** argv)
         {
           std::cerr << "Error: the -o command line option expects an argument.\n"
                        "Invoke without options for usage description\n";
-          return 1;
+          std::exit(1);
         }
         file_outputs.emplace_back(std::ofstream(argv[i + 1]), stdout_options);
         stdout_options = OutputOptions();
@@ -302,7 +307,7 @@ int main(int argc, char** argv)
         {
           std::cerr << "Error: the -i command line option expects an argument.\n"
                        "Invoke without options for usage description\n";
-          return 1;
+          std::exit(1);
         }
         inputfile = argv[i + 1];
         i += 1;
@@ -327,19 +332,21 @@ int main(int argc, char** argv)
       case '7':
       case '8':
       case '9':
-        stdout_options.columns.emplace_back(ColumnOptions{(unsigned int)argv[i][n] - '0', "", ""});
+        stdout_options.columns.emplace_back(
+            ColumnOptions{static_cast<unsigned int>(argv[i][n] - '0'), "", ""});
         break;
       case 'p':
         if (argv[i][n + 1] != 0 || i + 1 == argc)
         {
           std::cerr << "Error: the -p command line option expects an argument.\n"
                        "Invoke without options for usage description\n";
-          return 1;
+          std::exit(1);
         }
         if (stdout_options.columns.empty())
         {
           std::cerr << "Error: no column was specified for -p to apply to.\n"
                        "Invoke without options for usage description\n";
+          std::exit(1);
         }
         stdout_options.columns.back().prefix = argv[i + 1];
         i += 1;
@@ -350,12 +357,13 @@ int main(int argc, char** argv)
         {
           std::cerr << "Error: the -d command line option expects an argument.\n"
                        "Invoke without options for usage description\n";
-          return 1;
+          std::exit(1);
         }
         if (stdout_options.columns.empty())
         {
           std::cerr << "Error: no column was specified for -d to apply to.\n"
                        "Invoke without options for usage description\n";
+          std::exit(1);
         }
         stdout_options.columns.back().default_ = argv[i + 1];
         i += 1;
@@ -363,7 +371,7 @@ int main(int argc, char** argv)
         break;
       default:
         std::cerr << "Error: unrecognized command line option -" << argv[i][n] << '\n';
-        return 1;
+        std::exit(1);
       }
       if (skip)
       {
@@ -371,16 +379,10 @@ int main(int argc, char** argv)
       }
     }
   }
-  std::vector<std::deque<std::string>> rows;
-  if (inputfile.empty())
-  {
-    ReadTable(std::cin, rows);
-  }
-  else
-  {
-    auto file = std::ifstream(inputfile);
-    ReadTable(file, rows);
-  }
+}
+
+std::vector<InputLine> ParseTableToLines(std::vector<std::deque<std::string>> rows)
+{
   std::vector<InputLine> lines;
   for (auto& row : rows)
   {
@@ -394,7 +396,7 @@ int main(int argc, char** argv)
         {
           std::cerr << "Error: not enough cells for subtable reference in line "
                     << (lines.size() + 1) << '\n';
-          return 1;
+          std::exit(1);
         }
         lines.push_back(SubTable{row[0]});
       }
@@ -404,7 +406,7 @@ int main(int argc, char** argv)
         {
           std::cerr << "Error: not enough cells for subtable marker in line " << (lines.size() + 1)
                     << '\n';
-          return 1;
+          std::exit(1);
         }
         int shift = std::stoi(row[1]);
         int len = std::stoi(row[2]);
@@ -412,13 +414,13 @@ int main(int argc, char** argv)
         {
           std::cerr << "Error: field for table \"" << row[0] << "\" is not 1–6 bits in line "
                     << (lines.size() + 1) << '\n';
-          return 1;
+          std::exit(1);
         }
         if (shift > 32 - len || shift < 0)
         {
           std::cerr << "Error: field for table \"" << row[0]
                     << "\" has invalid shift value in line " << (lines.size() + 1) << '\n';
-          return 1;
+          std::exit(1);
         }
         lines.push_back(StartTableMarker{row[0], shift, len, row[3]});
       }
@@ -439,7 +441,7 @@ int main(int argc, char** argv)
       {
         std::cerr << "Error: not enough cells for instruction description in line "
                   << (lines.size() + 1) << '\n';
-        return 1;
+        std::exit(1);
       }
     }
     else
@@ -447,6 +449,26 @@ int main(int argc, char** argv)
       lines.push_back(Empty());
     }
   }
+  return lines;
+}
+
+int main(int argc, char** argv)
+{
+  std::vector<std::pair<std::ofstream, OutputOptions>> file_outputs;
+  OutputOptions stdout_options;
+  std::string inputfile;
+  ParseCommandLine(argc, argv, stdout_options, file_outputs, inputfile);
+  std::vector<std::deque<std::string>> rows;
+  if (inputfile.empty())
+  {
+    ReadTable(std::cin, rows);
+  }
+  else
+  {
+    auto file = std::ifstream(inputfile);
+    ReadTable(file, rows);
+  }
+  auto lines = ParseTableToLines(std::move(rows));
   std::vector<Instruction> table;
   std::vector<DecodingEntry> decoding_table;
   decoding_table.push_back(DecodingEntry("Primary"));
