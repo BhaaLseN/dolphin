@@ -105,7 +105,7 @@ bool AnalyzeFunction(u32 startAddr, Common::Symbol& func, u32 max_size)
     }
     const PowerPC::TryReadInstResult read_result = PowerPC::TryReadInstruction(addr);
     const UGeckoInstruction instr = read_result.hex;
-    if (read_result.valid && PPCTables::GetOpId(instr) != OpId::Invalid)
+    if (read_result.valid && PPCTables::GetOpID(instr) != OpID::Invalid)
     {
       // BLR or RFI
       // 4e800021 is blrl, not the end of a function
@@ -193,8 +193,8 @@ static void AnalyzeFunction2(Common::Symbol* func)
 
 static bool CanSwapAdjacentOps(const CodeOp& a, const CodeOp& b)
 {
-  const GekkoOPInfo& a_info = PPCTables::opinfo[(int)a.opid];
-  const GekkoOPInfo& b_info = PPCTables::opinfo[(int)b.opid];
+  const GekkoOPInfo& a_info = PPCTables::opinfo[static_cast<int>(a.opid)];
+  const GekkoOPInfo& b_info = PPCTables::opinfo[static_cast<int>(b.opid)];
   int a_flags = a_info.flags;
   int b_flags = b_info.flags;
 
@@ -261,7 +261,7 @@ static void FindFunctionsFromBranches(u32 startAddr, u32 endAddr, Common::Symbol
     const PowerPC::TryReadInstResult read_result = PowerPC::TryReadInstruction(addr);
     const UGeckoInstruction instr = read_result.hex;
 
-    if (read_result.valid && PPCTables::GetOpId(instr) != OpId::Invalid)
+    if (read_result.valid && PPCTables::GetOpID(instr) != OpID::Invalid)
     {
       switch (instr.OPCD)
       {
@@ -309,7 +309,7 @@ static void FindFunctionsFromHandlers(PPCSymbolDB* func_db)
   for (const auto& entry : handlers)
   {
     const PowerPC::TryReadInstResult read_result = PowerPC::TryReadInstruction(entry.first);
-    if (read_result.valid && PPCTables::GetOpId(read_result.hex) != OpId::Invalid)
+    if (read_result.valid && PPCTables::GetOpID(read_result.hex) != OpID::Invalid)
     {
       // Check if this function is already mapped
       Common::Symbol* f = func_db->AddFunction(entry.first);
@@ -341,7 +341,7 @@ static void FindFunctionsAfterReturnInstruction(PPCSymbolDB* func_db)
         location += 4;
         read_result = PowerPC::TryReadInstruction(location);
       }
-      if (read_result.valid && PPCTables::GetOpId(read_result.hex) != OpId::Invalid)
+      if (read_result.valid && PPCTables::GetOpID(read_result.hex) != OpID::Invalid)
       {
         // check if this function is already mapped
         Common::Symbol* f = func_db->AddFunction(location);
@@ -439,7 +439,7 @@ static bool isCmp(const CodeOp& a)
 
 static bool isCarryOp(const CodeOp& a)
 {
-  auto& info = PPCTables::opinfo[(int)a.opid];
+  auto& info = PPCTables::opinfo[static_cast<int>(a.opid)];
   return (info.flags & FL_SET_CA) && !(info.flags & FL_SET_OE) && info.type == OpType::Integer;
 }
 
@@ -477,8 +477,8 @@ void PPCAnalyzer::ReorderInstructionsCore(u32 instructions, CodeOp* code, bool r
         // once we're next to a carry instruction, don't move away!
         if (type == ReorderType::Carry && i != start)
         {
-          auto aflags = PPCTables::opinfo[(int)a.opid].flags;
-          auto prevflags = PPCTables::opinfo[(int)code[i - increment].opid].flags;
+          auto aflags = PPCTables::opinfo[static_cast<int>(a.opid)].flags;
+          auto prevflags = PPCTables::opinfo[static_cast<int>(code[i - increment].opid)].flags;
           // if we read the CA flag, and the previous instruction sets it, don't move away.
           if (!reverse && (aflags & FL_READ_CA) && (prevflags & FL_SET_CA))
             continue;
@@ -687,8 +687,8 @@ u32 PPCAnalyzer::Analyze(u32 address, CodeBlock* block, CodeBuffer* buffer, std:
     num_inst++;
 
     const UGeckoInstruction inst = result.hex;
-    OpId opid = PPCTables::GetOpId(inst);
-    GekkoOPInfo& opinfo = PPCTables::opinfo[(int)opid];
+    OpID opid = PPCTables::GetOpID(inst);
+    const GekkoOPInfo& opinfo = PPCTables::opinfo[static_cast<int>(opid)];
     code[i] = {};
     code[i].opid = opid;
     code[i].address = address;
@@ -861,7 +861,7 @@ u32 PPCAnalyzer::Analyze(u32 address, CodeBlock* block, CodeBuffer* buffer, std:
     gprInUse |= op.regsIn;
     gprInReg |= op.regsIn;
     fprInUse |= op.fregsIn;
-    if (strncmp(PPCTables::opinfo[(int)op.opid].opname, "stfd", 4))
+    if (strncmp(PPCTables::opinfo[static_cast<int>(op.opid)].opname, "stfd", 4))
       fprInXmm |= op.fregsIn;
     // For now, we need to count output registers as "used" though; otherwise the flush
     // will result in a redundant store (e.g. store to regcache, then store again to
@@ -877,7 +877,7 @@ u32 PPCAnalyzer::Analyze(u32 address, CodeBlock* block, CodeBuffer* buffer, std:
   for (u32 i = 0; i < block->m_num_instructions; i++)
   {
     CodeOp& op = code[i];
-    GekkoOPInfo& opinfo = PPCTables::opinfo[(int)op.opid];
+    const GekkoOPInfo& opinfo = PPCTables::opinfo[static_cast<int>(op.opid)];
 
     gprBlockInputs |= op.regsIn & ~gprDefined;
     gprDefined |= op.regsOut;

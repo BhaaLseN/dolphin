@@ -363,8 +363,8 @@ const GekkoOPTemplate table63_2[] = {
 void Jit64::CompileInstruction(PPCAnalyst::CodeOp& op)
 {
   (this->*dynaOpTable[op.inst.OPCD])(op.inst);
-  instructionCompileCount[(int)op.opid]++;
-  instructionLastUse[(int)op.opid] = js.compilerPC;
+  instructionCompileCount[static_cast<int>(op.opid)]++;
+  instructionLastUse[static_cast<int>(op.opid)] = js.compilerPC;
 }
 
 void Jit64::InitializeInstructionTables()

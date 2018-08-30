@@ -95,8 +95,8 @@ struct GekkoOPInfo
 // An OpID identifies a distinctive instruction encoding and constitutes
 // a shared concept of a 'PPC operation' among the JITs and other
 // CPU emulation components.
-// Use PPCTables::GetOpId to get the right one for a given instruction.
-enum class OpId : int
+// Use PPCTables::GetOpID to get the right one for a given instruction.
+enum class OpID : int
 {
   Invalid = 0,
 #include "OpID_Ranges.gen.h"
@@ -104,9 +104,9 @@ enum class OpId : int
 
 namespace PPCTables
 {
-extern std::array<GekkoOPInfo, (size_t)OpId::End> opinfo;
-OpId GetOpId(UGeckoInstruction inst);
-int Cycles(OpId opid);
+extern const std::array<GekkoOPInfo, (size_t)OpID::End> opinfo;
+OpID GetOpID(UGeckoInstruction inst);
+int Cycles(OpID opid);
 
 void PrintInstructionRunCounts();
 const char* GetInstructionName(UGeckoInstruction inst);

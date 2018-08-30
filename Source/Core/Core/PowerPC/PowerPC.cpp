@@ -35,7 +35,6 @@ PowerPCState ppcState;
 static CPUCoreBase* s_cpu_core_base = nullptr;
 static bool s_cpu_core_base_is_injected = false;
 Interpreter interpreter;
-Interpreter* const s_interpreter = &interpreter;
 static CoreMode s_mode = CoreMode::Interpreter;
 
 BreakPoints breakpoints;
@@ -181,7 +180,7 @@ static void InitializeCPUCore(CPUCore cpu_core)
   switch (cpu_core)
   {
   case CPUCore::Interpreter:
-    s_cpu_core_base = s_interpreter;
+    s_cpu_core_base = &interpreter;
     break;
 
   default:
@@ -194,7 +193,7 @@ static void InitializeCPUCore(CPUCore cpu_core)
     break;
   }
 
-  s_mode = s_cpu_core_base == s_interpreter ? CoreMode::Interpreter : CoreMode::JIT;
+  s_mode = s_cpu_core_base == &interpreter ? CoreMode::Interpreter : CoreMode::JIT;
 }
 
 const std::vector<CPUCore>& AvailableCPUCores()
@@ -281,14 +280,14 @@ static void ApplyMode()
   switch (s_mode)
   {
   case CoreMode::Interpreter:  // Switching from JIT to interpreter
-    s_cpu_core_base = s_interpreter;
+    s_cpu_core_base = &interpreter;
     break;
 
   case CoreMode::JIT:  // Switching from interpreter to JIT.
     // Don't really need to do much. It'll work, the cache will refill itself.
     s_cpu_core_base = JitInterface::GetCore();
     if (!s_cpu_core_base)  // Has a chance to not get a working JIT core if one isn't active on host
-      s_cpu_core_base = s_interpreter;
+      s_cpu_core_base = &interpreter;
     break;
   }
 }

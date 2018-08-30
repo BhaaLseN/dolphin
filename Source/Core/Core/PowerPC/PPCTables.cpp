@@ -45,29 +45,28 @@ struct OpDispatch
   u8 subop_shift;
   u8 subop_len;
 };
-static std::array<OpDispatch, 30> dispatch_table = {{
+constexpr std::array<OpDispatch, 30> dispatch_table = {{
 #include "OpID_DecodingTable.gen.cpp"
 }};
 
-static constexpr GekkoOPInfo UNKNOWN = {"Invalid Opcode", OpType::Invalid, 0};
+constexpr GekkoOPInfo UNKNOWN = {"Invalid Opcode", OpType::Invalid, 0};
 
-std::array<GekkoOPInfo, (size_t)OpId::End> opinfo = {{
+const std::array<GekkoOPInfo, static_cast<size_t>(OpID::End)> opinfo = {{
     UNKNOWN,
 #include "OpInfo.gen.cpp"
 }};
 
-OpId GetOpId(UGeckoInstruction instruction)
+OpID GetOpID(UGeckoInstruction instruction)
 {
   int subtable = 0;
   while (true)
   {
-    auto disp = dispatch_table[subtable];
-    int opcode = (instruction.hex >> disp.subop_shift) & ((1 << disp.subop_len) - 1);
+    const auto& disp = dispatch_table[subtable];
+    u32 opcode = (instruction.hex >> disp.subop_shift) & ((1 << disp.subop_len) - 1);
     auto shifted = disp.leaf_flags >> (63 - opcode);
     if (shifted[0])
     {
-      int res = disp.op_index_start + shifted.count() - 1;
-      return (OpId)res;
+      return static_cast<OpID>(disp.op_index_start + shifted.count() - 1);
     }
     else if ((disp.subtables >> (63 - opcode))[0])
     {
@@ -75,25 +74,25 @@ OpId GetOpId(UGeckoInstruction instruction)
     }
     else
     {
-      ERROR_LOG(DYNA_REC, "subtable %d, value %d not found", subtable, opcode);
-      return OpId::Invalid;
+      ERROR_LOG(POWERPC, "subtable %d, value %d not found", subtable, opcode);
+      return OpID::Invalid;
     }
   }
 }
 
-static const std::array<u8, (size_t)OpId::End> cycles = {{
+constexpr std::array<u8, (size_t)OpID::End> cycles = {{
     0,
 #include "Cycles_Table.gen.cpp"
 }};
 
-int Cycles(OpId opid)
+int Cycles(OpID opid)
 {
-  return cycles[(int)opid];
+  return cycles[static_cast<int>(opid)];
 }
 
 const char* GetInstructionName(UGeckoInstruction inst)
 {
-  return opinfo[(int)GetOpId(inst)].opname;
+  return opinfo[static_cast<int>(GetOpID(inst))].opname;
 }
 
 }  // namespace

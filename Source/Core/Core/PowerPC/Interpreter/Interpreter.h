@@ -264,7 +264,7 @@ public:
   static void isync(UGeckoInstruction inst);
 
   using Instruction = void (*)(UGeckoInstruction inst);
-  static const std::array<Instruction, (size_t)OpId::End> m_op_table;
+  static const std::array<Instruction, static_cast<size_t>(OpID::End)> m_op_table;
 
   static void RunTable4(UGeckoInstruction inst);
   static void RunTable19(UGeckoInstruction inst);

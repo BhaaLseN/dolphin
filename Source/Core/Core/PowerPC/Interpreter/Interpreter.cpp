@@ -30,10 +30,11 @@
 
 static int startTrace = 0;
 
-const std::array<Interpreter::Instruction, (size_t)OpId::End> Interpreter::m_op_table = {{
-    Interpreter::unknown_instruction,
+constexpr std::array<Interpreter::Instruction, static_cast<size_t>(OpID::End)>
+    Interpreter::m_op_table = {{
+        Interpreter::unknown_instruction,
 #include "Interpreter_Table.gen.cpp"
-}};
+    }};
 
 static void Trace(UGeckoInstruction& inst)
 {
@@ -69,8 +70,8 @@ bool Interpreter::HandleFunctionHooking(u32 address)
 int Interpreter::SingleStepInner()
 {
   m_prev_inst.hex = PowerPC::Read_Opcode(PC);
-  auto opid = PPCTables::GetOpId(m_prev_inst);
-  if (opid == OpId::Invalid)
+  auto opid = PPCTables::GetOpID(m_prev_inst);
+  if (opid == OpID::Invalid)
   {
     CPU::Break();
   }
@@ -113,9 +114,9 @@ int Interpreter::SingleStepInner()
       else
       {
         // check if we have to generate a FPU unavailable exception
-        if (!(PPCTables::opinfo[(int)opid].flags & FL_USE_FPU))
+        if (!(PPCTables::opinfo[static_cast<int>(opid)].flags & FL_USE_FPU))
         {
-          m_op_table[(int)opid](m_prev_inst);
+          m_op_table[static_cast<int>(opid)](m_prev_inst);
           if (PowerPC::ppcState.Exceptions & EXCEPTION_DSI)
           {
             PowerPC::CheckExceptions();

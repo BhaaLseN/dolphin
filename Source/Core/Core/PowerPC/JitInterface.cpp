@@ -243,8 +243,8 @@ void CompileExceptionCheck(ExceptionType type)
     if (type == ExceptionType::FIFOWrite)
     {
       // Check in case the code has been replaced since: do we need to do this?
-      OpId opid = PPCTables::GetOpId(PowerPC::HostRead_U32(PC));
-      const OpType optype = PPCTables::opinfo[(int)opid].type;
+      OpID opid = PPCTables::GetOpID(PowerPC::HostRead_U32(PC));
+      const OpType optype = PPCTables::opinfo[static_cast<int>(opid)].type;
       if (optype != OpType::Store && optype != OpType::StoreFP && optype != OpType::StorePS)
         return;
     }
@@ -273,21 +273,21 @@ void LogCompiledInstructions()
     return;
   static unsigned int time = 0;
 
-  File::IOFile f(StringFromFormat("%sinst_log%i.txt", File::GetUserPath(D_LOGS_IDX).c_str(), time),
-                 "w");
-  File::IOFile g(StringFromFormat("%sinst_not%i.txt", File::GetUserPath(D_LOGS_IDX).c_str(), time),
-                 "w");
-  for (int opid = 0; opid < (int)OpId::End; opid += 1)
+  File::IOFile compiled_log(
+      StringFromFormat("%sinst_log%i.txt", File::GetUserPath(D_LOGS_IDX).c_str(), time), "w");
+  File::IOFile not_compiled_log(
+      StringFromFormat("%sinst_not%i.txt", File::GetUserPath(D_LOGS_IDX).c_str(), time), "w");
+  for (int opid = 0; opid < static_cast<int>(OpID::End); opid += 1)
   {
     auto& inst = PPCTables::opinfo[opid];
     if (g_jit->instructionCompileCount[opid] > 0)
     {
-      fprintf(f.GetHandle(), "%s\t%i\t%08x\n", inst.opname, g_jit->instructionCompileCount[opid],
-              g_jit->instructionLastUse[opid]);
+      fprintf(compiled_log.GetHandle(), "%s\t%i\t%08x\n", inst.opname,
+              g_jit->instructionCompileCount[opid], g_jit->instructionLastUse[opid]);
     }
     else
     {
-      fprintf(g.GetHandle(), "%s\n", inst.opname);
+      fprintf(not_compiled_log.GetHandle(), "%s\n", inst.opname);
     }
   }
 

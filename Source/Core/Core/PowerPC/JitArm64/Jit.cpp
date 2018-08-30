@@ -157,7 +157,7 @@ void JitArm64::FallBackToInterpreter(UGeckoInstruction inst)
     gpr.Unlock(WA);
   }
 
-  Interpreter::Instruction instr = Interpreter::m_op_table[js.op->opid];
+  Interpreter::Instruction instr = Interpreter::m_op_table[static_cast<int>(js.op->opid)];
   MOVI2R(W0, inst.hex);
   MOVP2R(X30, instr);
   BLR(X30);
@@ -748,7 +748,8 @@ void JitArm64::DoJit(u32 em_address, JitBlock* b, u32 nextPC)
 
     if (!op.skip)
     {
-      if ((PPCTables::opinfo[op.opid].flags & FL_USE_FPU) && !js.firstFPInstructionFound)
+      if ((PPCTables::opinfo[static_cast<int>(op.opid)].flags & FL_USE_FPU) &&
+          !js.firstFPInstructionFound)
       {
         // This instruction uses FPU - needs to add FP exception bailout
         ARM64Reg WA = gpr.GetReg();
@@ -779,7 +780,7 @@ void JitArm64::DoJit(u32 em_address, JitBlock* b, u32 nextPC)
 
       CompileInstruction(op);
       if (!CanMergeNextInstructions(1) ||
-          PPCTables::opinfo[js.op[1].opid].type != ::OpType::Integer)
+          PPCTables::opinfo[static_cast<int>(js.op[1].opid)].type != ::OpType::Integer)
         FlushCarry();
 
       // If we have a register that will never be used again, flush it.

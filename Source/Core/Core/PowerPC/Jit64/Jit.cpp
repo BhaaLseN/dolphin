@@ -289,7 +289,7 @@ void Jit64::FallBackToInterpreter(UGeckoInstruction inst)
 {
   gpr.Flush();
   fpr.Flush();
-  auto flags = PPCTables::opinfo[(int)js.op->opid].flags;
+  auto flags = PPCTables::opinfo[static_cast<int>(js.op->opid)].flags;
   if (flags & FL_ENDBLOCK)
   {
     MOV(32, PPCSTATE(pc), Imm32(js.compilerPC));
@@ -754,7 +754,7 @@ const u8* Jit64::DoJit(u32 em_address, JitBlock* b, u32 nextPC)
     js.op = &op;
     js.instructionNumber = i;
     js.instructionsLeft = (code_block.m_num_instructions - 1) - i;
-    auto flags = PPCTables::opinfo[(int)op.opid].flags;
+    auto flags = PPCTables::opinfo[static_cast<int>(op.opid)].flags;
     js.downcountAmount += PPCTables::Cycles(op.opid);
     js.fastmemLoadStore = nullptr;
     js.fixupExceptionHandler = false;

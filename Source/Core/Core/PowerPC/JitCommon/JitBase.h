@@ -129,8 +129,8 @@ public:
   JitOptions jo{};
   JitState js{};
 
-  std::array<u32, (size_t)OpId::End> instructionLastUse{};
-  std::array<int, (size_t)OpId::End> instructionCompileCount{};
+  std::array<u32, static_cast<size_t>(OpID::End)> instructionLastUse{};
+  std::array<int, static_cast<size_t>(OpID::End)> instructionCompileCount{};
 };
 
 void JitTrampoline(JitBase& jit, u32 em_address);
