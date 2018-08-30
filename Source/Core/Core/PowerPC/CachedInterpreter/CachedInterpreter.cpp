@@ -260,7 +260,7 @@ void CachedInterpreter::Jit(u32 address)
 
       if (endblock || memcheck)
         m_code.emplace_back(WritePC, op.address);
-      m_code.emplace_back(Interpreter::m_op_table[static_cast<int>(op.opid)], op.inst);
+      m_code.emplace_back(Interpreter::GetOpFunction(op.opid), op.inst);
       if (memcheck)
         m_code.emplace_back(CheckDSI, js.downcountAmount);
       if (endblock)

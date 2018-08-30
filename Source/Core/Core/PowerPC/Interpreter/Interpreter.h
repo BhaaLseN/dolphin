@@ -264,13 +264,7 @@ public:
   static void isync(UGeckoInstruction inst);
 
   using Instruction = void (*)(UGeckoInstruction inst);
-  static const std::array<Instruction, static_cast<size_t>(OpID::End)> m_op_table;
-
-  static void RunTable4(UGeckoInstruction inst);
-  static void RunTable19(UGeckoInstruction inst);
-  static void RunTable31(UGeckoInstruction inst);
-  static void RunTable59(UGeckoInstruction inst);
-  static void RunTable63(UGeckoInstruction inst);
+  static Instruction GetOpFunction(OpID opid) { return m_op_table[static_cast<int>(opid)]; }
 
   static u32 Helper_Carry(u32 value1, u32 value2);
 
@@ -292,6 +286,8 @@ private:
 
   static void Helper_FloatCompareOrdered(UGeckoInstruction inst, double a, double b);
   static void Helper_FloatCompareUnordered(UGeckoInstruction inst, double a, double b);
+
+  static const std::array<Instruction, static_cast<size_t>(OpID::End)> m_op_table;
 
   u32 last_pc;
   UGeckoInstruction m_prev_inst{};

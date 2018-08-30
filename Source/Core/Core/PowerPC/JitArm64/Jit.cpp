@@ -157,7 +157,7 @@ void JitArm64::FallBackToInterpreter(UGeckoInstruction inst)
     gpr.Unlock(WA);
   }
 
-  Interpreter::Instruction instr = Interpreter::m_op_table[static_cast<int>(js.op->opid)];
+  Interpreter::Instruction instr = Interpreter::GetOpFunction(js.op->opid);
   MOVI2R(W0, inst.hex);
   MOVP2R(X30, instr);
   BLR(X30);
