@@ -104,7 +104,7 @@ int Interpreter::SingleStepInner()
     {
       if (MSR.FP)  // If FPU is enabled, just execute
       {
-        m_op_table[(int)opid](m_prev_inst);
+        m_op_table[static_cast<int>(opid)](m_prev_inst);
         if (PowerPC::ppcState.Exceptions & EXCEPTION_DSI)
         {
           PowerPC::CheckExceptions();
@@ -114,7 +114,7 @@ int Interpreter::SingleStepInner()
       else
       {
         // check if we have to generate a FPU unavailable exception
-        if (!(PPCTables::opinfo[static_cast<int>(opid)].flags & FL_USE_FPU))
+        if (!(PPCTables::Flags(opid) & FL_USE_FPU))
         {
           m_op_table[static_cast<int>(opid)](m_prev_inst);
           if (PowerPC::ppcState.Exceptions & EXCEPTION_DSI)

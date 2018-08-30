@@ -16,13 +16,9 @@
 struct Instruction
 {
   std::string opname;
-  std::string type;
-  std::string flags;
   std::deque<std::string> dispatch;
-  Instruction(std::string opname_, std::string type_, std::string flags_,
-              std::deque<std::string> dispatch_)
-      : opname(std::move(opname_)), type(std::move(type_)), flags(std::move(flags_)),
-        dispatch(std::move(dispatch_))
+  Instruction(std::string opname_, std::deque<std::string> dispatch_)
+      : opname(std::move(opname_)), dispatch(std::move(dispatch_))
   {
   }
 };
@@ -51,7 +47,7 @@ enum
 {
   OPID_RANGES = 1,
   DECODING_TABLE = 2,
-  OPINFO_TABLE = 4,
+  OPNAME_TABLE = 4,
 };
 
 struct ColumnOptions
@@ -180,11 +176,11 @@ static void DoOutput(const std::vector<Instruction>& table,
           << dec.length << "},\n";
     }
   }
-  if (options.flags & OPINFO_TABLE)
+  if (options.flags & OPNAME_TABLE)
   {
     for (auto& inst : table)
     {
-      out << "{\"" << inst.opname << "\", OpType::" << inst.type << ", " << inst.flags << "},\n";
+      out << '\"' << inst.opname << "\", \n";
     }
   }
   if (!options.columns.empty())
@@ -197,28 +193,31 @@ static void DoOutput(const std::vector<Instruction>& table,
       }
       for (auto& col : options.columns)
       {
-        const std::string* val;
-        if (inst.dispatch.size() > col.column && !inst.dispatch[col.column].empty())
+        if (inst.dispatch.size() <= col.column || inst.dispatch[col.column].empty())
         {
-          val = &inst.dispatch[col.column];
+          if (col.default_ == "*")
+          {
+            out << col.prefix << inst.opname << ", ";
+          }
+          else
+          {
+            out << col.default_ << ", ";
+          }
+        }
+        else if (inst.dispatch[col.column] == "*")
+        {
+          out << col.prefix << inst.opname << ", ";
         }
         else
         {
-          val = &col.default_;
-        }
-        if (*val == "*")
-        {
-          out << col.prefix << inst.opname << ", \n";
-        }
-        else
-        {
-          out << *val << ", \n";
+          out << col.prefix << inst.dispatch[col.column] << ", ";
         }
       }
       if (options.columns.size() > 1)
       {
-        out << "}";
+        out << "},";
       }
+      out << '\n';
     }
   }
 }
@@ -268,7 +267,7 @@ void ParseCommandLine(int argc, char** argv, OutputOptions& stdout_options,
         "            are applied for stdout.\n"
         "-r          generate OpID range definition\n"
         "-D          generate decoding table\n"
-        "-I          generate opinfo table\n"
+        "-N          generate opname table\n"
         "-0…9        Generate a custom table. Add the column specified by the digit.\n"
         "-p <prefix>  Set the prefix for the previously-defined column."
         "-d <default> Set the default value for the previously-defined column. (use * for the "
@@ -319,8 +318,8 @@ void ParseCommandLine(int argc, char** argv, OutputOptions& stdout_options,
       case 'D':
         stdout_options.flags |= DECODING_TABLE;
         break;
-      case 'I':
-        stdout_options.flags |= OPINFO_TABLE;
+      case 'N':
+        stdout_options.flags |= OPNAME_TABLE;
         break;
       case '0':
       case '1':
@@ -429,19 +428,9 @@ std::vector<InputLine> ParseTableToLines(std::vector<std::deque<std::string>> ro
         // used for comments, treat as empty line
         lines.push_back(Empty());
       }
-      else if (row.size() >= 2)
-      {
-        std::string type = row.front();
-        row.pop_front();
-        std::string flags = row.front();
-        row.pop_front();
-        lines.push_back(Instruction(opname, type, flags, row));
-      }
       else
       {
-        std::cerr << "Error: not enough cells for instruction description in line "
-                  << (lines.size() + 1) << '\n';
-        std::exit(1);
+        lines.push_back(Instruction(opname, row));
       }
     }
     else

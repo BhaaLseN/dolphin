@@ -240,7 +240,7 @@ void CachedInterpreter::Jit(u32 address)
     {
       const bool breakpoint = SConfig::GetInstance().bEnableDebugging &&
                               PowerPC::breakpoints.IsAddressBreakPoint(op.address);
-      auto flags = PPCTables::opinfo[static_cast<int>(op.opid)].flags;
+      auto flags = PPCTables::Flags(op.opid);
       const bool check_fpu = (flags & FL_USE_FPU) && !js.firstFPInstructionFound;
       const bool endblock = (flags & FL_ENDBLOCK) != 0;
       const bool memcheck = (flags & FL_LOADSTORE) && jo.memcheck;

@@ -49,13 +49,6 @@ constexpr std::array<OpDispatch, 30> dispatch_table = {{
 #include "OpID_DecodingTable.gen.cpp"
 }};
 
-constexpr GekkoOPInfo UNKNOWN = {"Invalid Opcode", OpType::Invalid, 0};
-
-const std::array<GekkoOPInfo, static_cast<size_t>(OpID::End)> opinfo = {{
-    UNKNOWN,
-#include "OpInfo.gen.cpp"
-}};
-
 OpID GetOpID(UGeckoInstruction instruction)
 {
   int subtable = 0;
@@ -90,9 +83,39 @@ int Cycles(OpID opid)
   return cycles[static_cast<int>(opid)];
 }
 
+constexpr std::array<const char*, static_cast<size_t>(OpID::End)> opnames = {{
+    "Invalid Opcode",
+#include "OpNames.gen.cpp"
+}};
+
+const char* OpName(OpID opid)
+{
+  return opnames[static_cast<int>(opid)];
+}
+
 const char* GetInstructionName(UGeckoInstruction inst)
 {
-  return opinfo[static_cast<int>(GetOpID(inst))].opname;
+  return opnames[static_cast<int>(GetOpID(inst))];
+}
+
+constexpr std::array<OpType, static_cast<size_t>(OpID::End)> optypes = {{
+    OpType::Invalid,
+#include "OpTypes.gen.cpp"
+}};
+
+OpType Type(OpID opid)
+{
+  return optypes[static_cast<int>(opid)];
+}
+
+constexpr std::array<u32, static_cast<size_t>(OpID::End)> opflags = {{
+    0,
+#include "OpFlags.gen.cpp"
+}};
+
+u32 Flags(OpID opid)
+{
+  return opflags[static_cast<int>(opid)];
 }
 
 }  // namespace

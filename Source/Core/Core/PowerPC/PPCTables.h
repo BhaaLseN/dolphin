@@ -60,7 +60,7 @@ enum : u32
   FL_INOUT_FLOAT_D = FL_IN_FLOAT_D | FL_OUT_FLOAT_D,
 };
 
-enum class OpType : u32
+enum class OpType : u8
 {
   Invalid,
   Subtable,
@@ -84,13 +84,6 @@ enum class OpType : u32
   Unknown,
 };
 
-struct GekkoOPInfo
-{
-  const char* opname;
-  OpType type;
-  u32 flags;
-};
-
 // The current (half-open) ranges of OpID.
 // An OpID identifies a distinctive instruction encoding and constitutes
 // a shared concept of a 'PPC operation' among the JITs and other
@@ -104,9 +97,11 @@ enum class OpID : int
 
 namespace PPCTables
 {
-extern const std::array<GekkoOPInfo, (size_t)OpID::End> opinfo;
 OpID GetOpID(UGeckoInstruction inst);
 int Cycles(OpID opid);
+u32 Flags(OpID opid);
+OpType Type(OpID opid);
+const char* OpName(OpID opid);
 
 void PrintInstructionRunCounts();
 const char* GetInstructionName(UGeckoInstruction inst);

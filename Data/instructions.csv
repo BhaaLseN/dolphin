@@ -10,11 +10,7 @@
 ;Empty lines (this includes comment lines!) define unknown/invalid instructions. They are ignored at the end of the table.
 ;Lines with '->' in the first cell define that the instruction has to be decoded by examining another table (with the name in the second cell)
 ;Other lines define a valid instruction
-;Currently, the first three cells are special to the table generator:
-;The first is the instruction name (opname)
-;The second is the OpType
-;The third are flags
-;These three values are used to fill the OpInfo table
+;Currently, the first cell is special to the table generator: it can be used as a default value for empty cells in other columns
 ;The cells after that are not used for the OpInfo table but can be used to generate other tables
 ;The current use of the columns is as follows:
 ;OpType;flags;Interpreter function (instruction name if empty);Estimated cycle count (1 if empty)
