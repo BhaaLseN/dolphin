@@ -73,49 +73,42 @@ OpID GetOpID(UGeckoInstruction instruction)
   }
 }
 
-constexpr std::array<u8, (size_t)OpID::End> cycles = {{
-    0,
-#include "Cycles_Table.gen.cpp"
+struct GekkoOPInfo
+{
+  const char* opname;
+  u32 flags;
+  OpType type;
+  u8 cycles;
+};
+
+constexpr std::array<GekkoOPInfo, (size_t)OpID::End> opinfo = {{
+    {"Invalid instruction", 0, OpType::Invalid, 0},
+#include "OpInfo.gen.cpp"
 }};
 
 int Cycles(OpID opid)
 {
-  return cycles[static_cast<int>(opid)];
+  return opinfo[static_cast<int>(opid)].cycles;
 }
-
-constexpr std::array<const char*, static_cast<size_t>(OpID::End)> opnames = {{
-    "Invalid Opcode",
-#include "OpNames.gen.cpp"
-}};
 
 const char* OpName(OpID opid)
 {
-  return opnames[static_cast<int>(opid)];
+  return opinfo[static_cast<int>(opid)].opname;
 }
 
 const char* GetInstructionName(UGeckoInstruction inst)
 {
-  return opnames[static_cast<int>(GetOpID(inst))];
+  return opinfo[static_cast<int>(GetOpID(inst))].opname;
 }
-
-constexpr std::array<OpType, static_cast<size_t>(OpID::End)> optypes = {{
-    OpType::Invalid,
-#include "OpTypes.gen.cpp"
-}};
 
 OpType Type(OpID opid)
 {
-  return optypes[static_cast<int>(opid)];
+  return opinfo[static_cast<int>(opid)].type;
 }
-
-constexpr std::array<u32, static_cast<size_t>(OpID::End)> opflags = {{
-    0,
-#include "OpFlags.gen.cpp"
-}};
 
 u32 Flags(OpID opid)
 {
-  return opflags[static_cast<int>(opid)];
+  return opinfo[static_cast<int>(opid)].flags;
 }
 
 }  // namespace

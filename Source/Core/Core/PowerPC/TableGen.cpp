@@ -4,7 +4,6 @@
 
 #include <bitset>
 #include <cstdlib>
-#include <deque>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -15,12 +14,7 @@
 
 struct Instruction
 {
-  std::string opname;
-  std::deque<std::string> dispatch;
-  Instruction(std::string opname_, std::deque<std::string> dispatch_)
-      : opname(std::move(opname_)), dispatch(std::move(dispatch_))
-  {
-  }
+  std::vector<std::string> cells;
 };
 
 struct SubTable
@@ -54,7 +48,8 @@ struct ColumnOptions
 {
   unsigned int column;
   std::string prefix;
-  std::string default_;
+  std::string suffix;
+  std::string default_value;
 };
 
 struct OutputOptions
@@ -176,13 +171,6 @@ static void DoOutput(const std::vector<Instruction>& table,
           << dec.length << "},\n";
     }
   }
-  if (options.flags & OPNAME_TABLE)
-  {
-    for (auto& inst : table)
-    {
-      out << '\"' << inst.opname << "\", \n";
-    }
-  }
   if (!options.columns.empty())
   {
     for (auto& inst : table)
@@ -193,24 +181,24 @@ static void DoOutput(const std::vector<Instruction>& table,
       }
       for (auto& col : options.columns)
       {
-        if (inst.dispatch.size() <= col.column || inst.dispatch[col.column].empty())
+        if (inst.cells.size() <= col.column || inst.cells[col.column].empty())
         {
-          if (col.default_ == "*")
+          if (col.default_value == "*")
           {
-            out << col.prefix << inst.opname << ", ";
+            out << col.prefix << inst.cells.at(0) << col.suffix << ", ";
           }
           else
           {
-            out << col.default_ << ", ";
+            out << col.default_value << ", ";
           }
         }
-        else if (inst.dispatch[col.column] == "*")
+        else if (inst.cells[col.column] == "*")
         {
-          out << col.prefix << inst.opname << ", ";
+          out << col.prefix << inst.cells[0] << col.suffix << ", ";
         }
         else
         {
-          out << col.prefix << inst.dispatch[col.column] << ", ";
+          out << col.prefix << inst.cells[col.column] << col.suffix << ", ";
         }
       }
       if (options.columns.size() > 1)
@@ -222,14 +210,14 @@ static void DoOutput(const std::vector<Instruction>& table,
   }
 }
 
-static void ReadTable(std::istream& in, std::vector<std::deque<std::string>>& rows)
+static void ReadTable(std::istream& in, std::vector<std::vector<std::string>>& rows)
 {
   while (!in.eof())
   {
     std::string line;
     std::getline(in, line);
-    std::deque<std::string>::size_type nextpos, pos = 0;
-    std::deque<std::string> row;
+    std::vector<std::string>::size_type nextpos, pos = 0;
+    std::vector<std::string> row;
     if (line.empty())
     {
       rows.push_back(std::move(row));
@@ -253,9 +241,9 @@ static void ReadTable(std::istream& in, std::vector<std::deque<std::string>>& ro
   }
 }
 
-void ParseCommandLine(int argc, char** argv, OutputOptions& stdout_options,
-                      std::vector<std::pair<std::ofstream, OutputOptions>>& file_outputs,
-                      std::string& inputfile)
+static void ParseCommandLine(int argc, char** argv, OutputOptions& stdout_options,
+                             std::vector<std::pair<std::ofstream, OutputOptions>>& file_outputs,
+                             std::string& inputfile)
 {
   if (argc == 1)
   {
@@ -267,9 +255,9 @@ void ParseCommandLine(int argc, char** argv, OutputOptions& stdout_options,
         "            are applied for stdout.\n"
         "-r          generate OpID range definition\n"
         "-D          generate decoding table\n"
-        "-N          generate opname table\n"
         "-0…9        Generate a custom table. Add the column specified by the digit.\n"
         "-p <prefix>  Set the prefix for the previously-defined column."
+        "-s <prefix>  Set the suffix for the previously-defined column."
         "-d <default> Set the default value for the previously-defined column. (use * for the "
         "opname)\n";
     std::cout << "Usage: " << argv[0] << help_string;
@@ -318,9 +306,6 @@ void ParseCommandLine(int argc, char** argv, OutputOptions& stdout_options,
       case 'D':
         stdout_options.flags |= DECODING_TABLE;
         break;
-      case 'N':
-        stdout_options.flags |= OPNAME_TABLE;
-        break;
       case '0':
       case '1':
       case '2':
@@ -351,6 +336,23 @@ void ParseCommandLine(int argc, char** argv, OutputOptions& stdout_options,
         i += 1;
         skip = true;
         break;
+      case 's':
+        if (argv[i][n + 1] != 0 || i + 1 == argc)
+        {
+          std::cerr << "Error: the -s command line option expects an argument.\n"
+                       "Invoke without options for usage description\n";
+          std::exit(1);
+        }
+        if (stdout_options.columns.empty())
+        {
+          std::cerr << "Error: no column was specified for -s to apply to.\n"
+                       "Invoke without options for usage description\n";
+          std::exit(1);
+        }
+        stdout_options.columns.back().suffix = argv[i + 1];
+        i += 1;
+        skip = true;
+        break;
       case 'd':
         if (argv[i][n + 1] != 0 || i + 1 == argc)
         {
@@ -364,7 +366,7 @@ void ParseCommandLine(int argc, char** argv, OutputOptions& stdout_options,
                        "Invoke without options for usage description\n";
           std::exit(1);
         }
-        stdout_options.columns.back().default_ = argv[i + 1];
+        stdout_options.columns.back().default_value = argv[i + 1];
         i += 1;
         skip = true;
         break;
@@ -380,15 +382,14 @@ void ParseCommandLine(int argc, char** argv, OutputOptions& stdout_options,
   }
 }
 
-std::vector<InputLine> ParseTableToLines(std::vector<std::deque<std::string>> rows)
+static std::vector<InputLine> ParseTableToLines(std::vector<std::vector<std::string>> rows)
 {
   std::vector<InputLine> lines;
   for (auto& row : rows)
   {
     if (!row.empty())
     {
-      std::string opname = row.front();
-      row.pop_front();
+      std::string& opname = row.front();
       if (opname == "->")
       {
         if (row.size() < 1)
@@ -397,7 +398,7 @@ std::vector<InputLine> ParseTableToLines(std::vector<std::deque<std::string>> ro
                     << (lines.size() + 1) << '\n';
           std::exit(1);
         }
-        lines.push_back(SubTable{row[0]});
+        lines.push_back(SubTable{row[1]});
       }
       else if (opname == "===")
       {
@@ -407,21 +408,21 @@ std::vector<InputLine> ParseTableToLines(std::vector<std::deque<std::string>> ro
                     << '\n';
           std::exit(1);
         }
-        int shift = std::stoi(row[1]);
-        int len = std::stoi(row[2]);
+        int shift = std::stoi(row[2]);
+        int len = std::stoi(row[3]);
         if (len > 6 || len < 1)
         {
-          std::cerr << "Error: field for table \"" << row[0] << "\" is not 1–6 bits in line "
+          std::cerr << "Error: field for table \"" << row[1] << "\" is not 1–6 bits in line "
                     << (lines.size() + 1) << '\n';
           std::exit(1);
         }
         if (shift > 32 - len || shift < 0)
         {
-          std::cerr << "Error: field for table \"" << row[0]
+          std::cerr << "Error: field for table \"" << row[1]
                     << "\" has invalid shift value in line " << (lines.size() + 1) << '\n';
           std::exit(1);
         }
-        lines.push_back(StartTableMarker{row[0], shift, len, row[3]});
+        lines.push_back(StartTableMarker{row[1], shift, len, row[4]});
       }
       else if (opname.empty() || opname == "#")
       {
@@ -430,7 +431,7 @@ std::vector<InputLine> ParseTableToLines(std::vector<std::deque<std::string>> ro
       }
       else
       {
-        lines.push_back(Instruction(opname, row));
+        lines.push_back(Instruction{std::move(row)});
       }
     }
     else
@@ -447,7 +448,7 @@ int main(int argc, char** argv)
   OutputOptions stdout_options;
   std::string inputfile;
   ParseCommandLine(argc, argv, stdout_options, file_outputs, inputfile);
-  std::vector<std::deque<std::string>> rows;
+  std::vector<std::vector<std::string>> rows;
   if (inputfile.empty())
   {
     ReadTable(std::cin, rows);
