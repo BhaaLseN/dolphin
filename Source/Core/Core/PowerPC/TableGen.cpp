@@ -132,7 +132,7 @@ static void CreateTable(std::vector<Instruction>& table, std::vector<DecodingEnt
   }
   entry.instructions <<= 64 + start - end;
   entry.subtables <<= 64 + start - end;
-  int offset = entry.subtable_offset;
+  const int offset = entry.subtable_offset;
   for (auto& i : subtables)
   {
     // WARNING: may invalidate 'entry'
@@ -247,7 +247,7 @@ static void ParseCommandLine(int argc, char** argv, OutputOptions& stdout_option
 {
   if (argc == 1)
   {
-    const char* help_string =
+    const char* const help_string =
         " [options]\n"
         "Options:\n"
         "-i <file>   read from this file, not stdin"
@@ -382,14 +382,14 @@ static void ParseCommandLine(int argc, char** argv, OutputOptions& stdout_option
   }
 }
 
-static std::vector<InputLine> ParseTableToLines(std::vector<std::vector<std::string>> rows)
+static std::vector<InputLine> ParseTableToLines(const std::vector<std::vector<std::string>> rows)
 {
   std::vector<InputLine> lines;
   for (auto& row : rows)
   {
     if (!row.empty())
     {
-      std::string& opname = row.front();
+      const std::string& opname = row.front();
       if (opname == "->")
       {
         if (row.size() < 1)

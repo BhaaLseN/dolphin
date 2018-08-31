@@ -144,7 +144,7 @@ void JitArm64::FallBackToInterpreter(UGeckoInstruction inst)
   gpr.Flush(FlushMode::FLUSH_ALL, js.op);
   fpr.Flush(FlushMode::FLUSH_ALL, js.op);
 
-  auto flags = PPCTables::Flags(js.op->opid);
+  const auto flags = PPCTables::Flags(js.op->opid);
 
   if (flags & FL_ENDBLOCK)
   {

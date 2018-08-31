@@ -243,7 +243,7 @@ void CompileExceptionCheck(ExceptionType type)
     if (type == ExceptionType::FIFOWrite)
     {
       // Check in case the code has been replaced since: do we need to do this?
-      OpID opid = PPCTables::GetOpID(PowerPC::HostRead_U32(PC));
+      const OpID opid = PPCTables::GetOpID(PowerPC::HostRead_U32(PC));
       const OpType optype = PPCTables::Type(opid);
       if (optype != OpType::Store && optype != OpType::StoreFP && optype != OpType::StorePS)
         return;

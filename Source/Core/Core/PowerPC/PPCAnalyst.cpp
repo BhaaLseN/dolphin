@@ -193,8 +193,8 @@ static void AnalyzeFunction2(Common::Symbol* func)
 
 static bool CanSwapAdjacentOps(const CodeOp& a, const CodeOp& b)
 {
-  int a_flags = PPCTables::Flags(a.opid);
-  int b_flags = PPCTables::Flags(b.opid);
+  const auto a_flags = PPCTables::Flags(a.opid);
+  const auto b_flags = PPCTables::Flags(b.opid);
 
   // can't reorder around breakpoints
   if (SConfig::GetInstance().bEnableDebugging &&
@@ -437,7 +437,7 @@ static bool isCmp(const CodeOp& a)
 
 static bool isCarryOp(const CodeOp& a)
 {
-  auto flags = PPCTables::Flags(a.opid);
+  const auto flags = PPCTables::Flags(a.opid);
   return (flags & FL_SET_CA) && !(flags & FL_SET_OE) && PPCTables::Type(a.opid) == OpType::Integer;
 }
 
@@ -475,8 +475,8 @@ void PPCAnalyzer::ReorderInstructionsCore(u32 instructions, CodeOp* code, bool r
         // once we're next to a carry instruction, don't move away!
         if (type == ReorderType::Carry && i != start)
         {
-          auto aflags = PPCTables::Flags(a.opid);
-          auto prevflags = PPCTables::Flags(code[i - increment].opid);
+          const auto aflags = PPCTables::Flags(a.opid);
+          const auto prevflags = PPCTables::Flags(code[i - increment].opid);
           // if we read the CA flag, and the previous instruction sets it, don't move away.
           if (!reverse && (aflags & FL_READ_CA) && (prevflags & FL_SET_CA))
             continue;
@@ -518,7 +518,7 @@ void PPCAnalyzer::ReorderInstructions(u32 instructions, CodeOp* code)
 
 void PPCAnalyzer::SetInstructionStats(CodeBlock* block, CodeOp* code, OpID opid, u32 index)
 {
-  auto flags = PPCTables::Flags(opid);
+  const auto flags = PPCTables::Flags(opid);
   code->wantsCR0 = false;
   code->wantsCR1 = false;
 
@@ -686,7 +686,7 @@ u32 PPCAnalyzer::Analyze(u32 address, CodeBlock* block, CodeBuffer* buffer, std:
     num_inst++;
 
     const UGeckoInstruction inst = result.hex;
-    OpID opid = PPCTables::GetOpID(inst);
+    const OpID opid = PPCTables::GetOpID(inst);
     code[i] = {};
     code[i].opid = opid;
     code[i].address = address;
@@ -875,8 +875,8 @@ u32 PPCAnalyzer::Analyze(u32 address, CodeBlock* block, CodeBuffer* buffer, std:
   for (u32 i = 0; i < block->m_num_instructions; i++)
   {
     CodeOp& op = code[i];
-    OpType type = PPCTables::Type(op.opid);
-    const char* opname = PPCTables::OpName(op.opid);
+    const OpType type = PPCTables::Type(op.opid);
+    const char* const opname = PPCTables::OpName(op.opid);
 
     gprBlockInputs |= op.regsIn & ~gprDefined;
     gprDefined |= op.regsOut;

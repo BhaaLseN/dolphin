@@ -55,8 +55,8 @@ OpID GetOpID(UGeckoInstruction instruction)
   while (true)
   {
     const auto& disp = dispatch_table[subtable];
-    u32 opcode = (instruction.hex >> disp.subop_shift) & ((1 << disp.subop_len) - 1);
-    auto shifted = disp.leaf_flags >> (63 - opcode);
+    const u32 opcode = (instruction.hex >> disp.subop_shift) & ((1 << disp.subop_len) - 1);
+    const auto shifted = disp.leaf_flags >> (63 - opcode);
     if (shifted[0])
     {
       return static_cast<OpID>(disp.op_index_start + shifted.count() - 1);

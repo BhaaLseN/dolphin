@@ -70,7 +70,7 @@ bool Interpreter::HandleFunctionHooking(u32 address)
 int Interpreter::SingleStepInner()
 {
   m_prev_inst.hex = PowerPC::Read_Opcode(PC);
-  auto opid = PPCTables::GetOpID(m_prev_inst);
+  const auto opid = PPCTables::GetOpID(m_prev_inst);
   if (opid == OpID::Invalid)
   {
     CPU::Break();

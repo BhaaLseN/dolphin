@@ -103,6 +103,5 @@ u32 Flags(OpID opid);
 OpType Type(OpID opid);
 const char* OpName(OpID opid);
 
-void PrintInstructionRunCounts();
 const char* GetInstructionName(UGeckoInstruction inst);
 }  // namespace PPCTables
