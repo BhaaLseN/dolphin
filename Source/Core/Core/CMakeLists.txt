@@ -232,14 +232,16 @@ add_custom_command(
     Generated/OpID_DecodingTable.gen.cpp
     Generated/OpInfo.gen.cpp
     Generated/Interpreter_Table.gen.cpp
+  COMMAND mkdir -p Generated
   COMMAND $<TARGET_FILE:tablegen> -i ${CMAKE_CURRENT_SOURCE_DIR}/../../../Data/instructions.csv
     -ro Generated/OpID_Ranges.gen.h
     -Do Generated/OpID_DecodingTable.gen.cpp
-    -0p \"\\\"\" -s \"\\\"\"  -2 -1p 'OpType::' -4d '1' -o Generated/OpInfo.gen.cpp
-    -3d '*' -p 'Interpreter::' -o Generated/Interpreter_Table.gen.cpp
-    -r0p "\"" -s "\""  -2 -1p 'OpType::' -4d '1'
+    -0p "\"" -s "\""  -2 -1p OpType:: -4d 1 -o Generated/OpInfo.gen.cpp
+    -3d * -p Interpreter:: -o Generated/Interpreter_Table.gen.cpp
+    -r0p "\"" -s "\""  -2 -1p OpType:: -4d 1
   DEPENDS tablegen
   MAIN_DEPENDENCY ../../../Data/instructions.csv
+  VERBATIM
 )
 target_include_directories(core PRIVATE
   ${CMAKE_CURRENT_BINARY_DIR}/Generated
