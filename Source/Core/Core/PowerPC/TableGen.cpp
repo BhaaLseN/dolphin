@@ -163,10 +163,11 @@ static void DoOutput(const std::vector<Instruction>& table,
   {
     for (auto& dec : decoding_table)
     {
-      out << "{0x" << std::hex << std::setfill('0') << std::setw(16) << dec.instructions.to_ulong()
-          << ", 0x" << std::setw(16) << dec.subtables.to_ulong() << std::dec
-          << ", "
+      //out << "{0x" << std::hex << std::setfill('0') << std::setw(16) << dec.instructions.to_ulong()
+      //    << ", 0x" << std::setw(16) << dec.subtables.to_ulong() << std::dec
           // for binary literals: "{0b" << dec.instructions << ", 0b" << dec.subtables
+      out << "{0b" << dec.instructions << ", 0b" << dec.subtables
+          << ", "
           << dec.instruction_offset + 1 << ", " << dec.subtable_offset << ", " << dec.shift << ", "
           << dec.length << "},\n";
     }
