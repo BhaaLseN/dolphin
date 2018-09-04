@@ -63,7 +63,7 @@ OpID GetOpID(UGeckoInstruction instruction)
     }
     else if ((disp.subtables >> (63 - opcode))[0])
     {
-      subtable = disp.dispatch_start + (disp.subtables >> (63 - opcode)).count() - 1;
+      subtable = disp.dispatch_start + static_cast<int>((disp.subtables >> (63 - opcode)).count()) - 1;
     }
     else
     {
