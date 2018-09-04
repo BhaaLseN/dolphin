@@ -74,8 +74,8 @@ struct DecodingEntry
 static void CreateTable(std::vector<Instruction>& table, std::vector<DecodingEntry>& decoding_table,
                         DecodingEntry& entry, const std::vector<InputLine>& lines)
 {
-  entry.instruction_offset = table.size();
-  entry.subtable_offset = decoding_table.size();
+  entry.instruction_offset = static_cast<int>(table.size());
+  entry.subtable_offset = static_cast<int>(decoding_table.size());
   std::vector<int> subtables;
   size_t start = 0;
   while (true)
@@ -100,7 +100,7 @@ static void CreateTable(std::vector<Instruction>& table, std::vector<DecodingEnt
     start += 1;
   }
   size_t end;
-  for (end = start; end < lines.size() && end - start < (1u << entry.length) &&
+  for (end = start; end < lines.size() && end - start < (static_cast<size_t>(1u) << entry.length) &&
                     !std::holds_alternative<StartTableMarker>(lines[end]);
        end += 1)
   {
@@ -113,11 +113,11 @@ static void CreateTable(std::vector<Instruction>& table, std::vector<DecodingEnt
     }
     else if (std::holds_alternative<SubTable>(lines[end]))
     {
-      subtables.push_back(end);
+      subtables.push_back(static_cast<int>(end));
       entry.subtables |= 1;
     }
   }
-  if (end - start == (1u << entry.length))
+  if (end - start == (static_cast<size_t>(1u) << entry.length))
   {
     for (size_t i = end; i < lines.size() && !std::holds_alternative<StartTableMarker>(lines[i]);
          i += 1)
