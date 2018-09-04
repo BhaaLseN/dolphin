@@ -46,7 +46,7 @@ struct OpDispatch
   u8 subop_len;
 };
 constexpr std::array<OpDispatch, 30> dispatch_table = {{
-#include "OpID_DecodingTable.gen.cpp"
+#include "Core/PowerPC/Generated/OpID_DecodingTable.gen.cpp"
 }};
 
 OpID GetOpID(UGeckoInstruction instruction)
@@ -83,7 +83,7 @@ struct GekkoOPInfo
 
 constexpr std::array<GekkoOPInfo, (size_t)OpID::End> opinfo = {{
     {"Invalid instruction", 0, OpType::Invalid, 0},
-#include "OpInfo.gen.cpp"
+#include "Core/PowerPC/Generated/OpInfo.gen.cpp"
 }};
 
 int Cycles(OpID opid)

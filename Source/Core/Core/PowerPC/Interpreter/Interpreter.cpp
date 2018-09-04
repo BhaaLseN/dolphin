@@ -33,7 +33,7 @@ static int startTrace = 0;
 constexpr std::array<Interpreter::Instruction, static_cast<size_t>(OpID::End)>
     Interpreter::m_op_table = {{
         Interpreter::unknown_instruction,
-#include "Interpreter_Table.gen.cpp"
+#include "Core/PowerPC/Generated/Interpreter_Table.gen.cpp"
     }};
 
 static void Trace(UGeckoInstruction& inst)

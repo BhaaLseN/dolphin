@@ -92,7 +92,7 @@ enum class OpType : u8
 enum class OpID : int
 {
   Invalid = 0,
-#include "OpID_Ranges.gen.h"
+#include "Core/PowerPC/Generated/OpID_Ranges.gen.h"
 };
 
 namespace PPCTables
